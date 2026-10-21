@@ -285,12 +285,48 @@ cosmic-text 给了每行的 ascent/descent 与基线位置，所以只需要实�
 
 那么 B 就不存在 —— **因为 flex 容器本身就是块级的，根本不会产生 inline formatting context**。
 
-**所以这个缺口是「设计规范自由度」换来的，不是「技术能力不足」。** 浏览器要支持它，是因为通用浏览器不能假设用户的 CSS 怎么写；我们可以。
+### 8.3 逐类替代方案与损失评估
+
+「不支持 inline 混排」不是「少写一种 CSS」，而是**少一种排版模型**。浏览器有四种容器：
+block container / inline container / flex container / grid container。
+我们只保留后三种 —— 因为 **flex/grid 容器里的子元素是块级盒**，横向排列由它们完成。
+
+| 依赖 inline 的典型写法 | 替代方案 | 损失 |
+|---|---|---|
+| 文字 + 图标同行 | `display:flex; align-items:center; gap:4px` | **无**（仅需多写一个 flex） |
+| 段落中部分文字加粗/变色/带链接 | **text run** —— 一个节点内多段带不同样式的文本 | **无**（cosmic-text 的 Buffer 本就是 run 组成，天然支持） |
+| 徽标 badge 跟在文字前 | flex 容器 + `align-items: baseline/center` | **无**（代价：文字不再自动绕排到 badge 之后，UI 里通常也不需要） |
+| `vertical-align: middle` | flex 的 `align-items` | **无** |
+| 跨行删除线 / 下划线 | 每个 text run 各自带 decoration | **无** |
+| 行高由父字体 strut 撑起 | flex 容器行高由 items 决定 | **无** |
+| **文字绕排浮动图 / inline-block**（`float:left` + 文字环绕） | **无对应方案** | **真实损失**，但 UI 里极少用 |
+| 行内元素参与块级流的自然宽度 | flex item 宽度 | 无 |
+| 匿名内联盒、inline 元素间的空白折叠 | 不需要 | 无 |
+
+**结论：损失集中在「文字绕排浮动元素」这一类，其余全部可替代。**
+
+替代能力的来源：
+
+- **flex / grid 横向排列** → taffy 原生
+- **一段文本内的多样式** → cosmic-text 的 Buffer 本就是 run 组成
+
+### 8.4 现实依据：设计稿本身就是 flex
+
+Figma 的 auto layout 用的就是 flex（更早的 "text layout" 才是绝对定位 + inline）。
+设计师交付的 Figma 文件导出成 CSS 时，绝大多数已经是 flex/grid 结构。
+**换句话说，「不允许 inline」几乎不限制真实的设计稿。**
+
+### 8.5 建议的规范条款
+
+> 1. 布局容器只允许 `display: flex` 与 `display: grid`
+> 2. 同一行内的非文本元素使用 `align-items: center` 或 `flex-end`，不使用基线对齐
+> 3. 文本内的局部样式用 text run 表达，不用嵌套元素
+> 4. 不使用 `float`，不使用 `display: inline` / `inline-block` 作为块级流中的兄弟节点
 
 | 规范策略 | inline 维度接近度 |
 |---|---|
 | 允许 inline 混排 | 50–70%（那是浏览器的复杂度） |
-| 禁用基线对齐，只允许 flex/grid + 原子化内联 | **99–100%** |
+| **按上述条款禁用** | **99–100%** |
 
 ---
 
