@@ -5,7 +5,7 @@
 >
 > **本文档取代了初版基于 Wails 的方案。** 需求确认为「Go + 原生平台 GPU 渲染」，因此系统 WebView 路线出局，候选收敛到 Gio / Fyne / giu。
 >
-> Go 与 Rust 两个生态的完整方案对比见 [`gui-framework-survey.md`](gui-framework-survey.md)。
+> Go 与 Rust 两个生态的完整方案对比见 [`gui-framework-survey.md`](gui-framework-survey.md)。设计稿到原生实现的还原度边界与达成条件见 [`ui-fidelity.md`](ui-fidelity.md)。
 
 本文聚焦 GUI 客户端。核心库、CLI、MCP Server 的选型见 [`architecture.md`](architecture.md)。
 

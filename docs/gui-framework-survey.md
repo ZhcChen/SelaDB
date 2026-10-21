@@ -250,6 +250,8 @@ gpui.rs 官网原文：
 
 ## 4. 根本矛盾：原生 GPU 渲染 与 100% 复刻 Web 设计稿 不可兼得
 
+> 补充：Gio 侧的能力缺口已逐项从源码核实，并给出「约束设计规范 + 黄金图回归」的达成路径，见 [`ui-fidelity.md`](ui-fidelity.md)。
+
 这是整个选型里最需要摊开讲的一点。
 
 **原生渲染框架不是浏览器，没有 CSS 引擎。** GPUI 已经是四者里最接近的（Taffy 同源算法 + Tailwind 风格 API），也只到 90–95%。Gio 更早一层（布局是自研的 flex/absolute/flexible space，没有 grid 布局）。
