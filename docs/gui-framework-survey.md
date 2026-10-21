@@ -348,6 +348,68 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 **gpui 的长板与短板刚好互补**：后端与 IME 是最强的，但可商用控件库和测试基建要自己补 —— 而这正好是 Gio 已经有的。
 
+### 3.6 自研 GUI 框架（Zig）路线的成本分析
+
+「在 Zig 里封装一层接口，每个平台走底层 GPU 实现」这条路的技术地图如下。
+
+#### 平台后端对照
+
+| 层 | macOS | Windows | Linux |
+|---|---|---|---|
+| 窗口 | Cocoa `NSWindow` | Win32 `HWND` | **Wayland `wl_surface`**（X11 作兼容回退） |
+| GPU | **Metal** | **DXGI + Direct3D 11/12** | **Vulkan**（回退 OpenGL 3.3） |
+| 文本 | CoreText | DirectWrite | FreeType + HarfBuzz + Fontconfig |
+| IME | `NSTextInputClient` | TSF / IMM32 | `wl_text_input` / XIM |
+| 着色器 | Metal Shading Language | HLSL / DXIL | SPIR-V |
+| 分发 | .app + codesign + notarization | MSIX / 安装器 | AppImage / deb / Flatpak |
+
+> **需要纠正一处概念**：WinUI 3 不是 GPU API，是基于 XAML 的 UI 框架（依赖 Windows App SDK 与 WinRT/COM 互操作），从 Zig 驱动它极其痛苦。Zig GUI 框架在 Windows 上应当走 **DXGI + D3D**，这与 wgpu 的 windows backend 一致。
+
+#### Linux 侧要点（用户不熟的部分）
+
+1. **Wayland 是必须支持的**。X11 正在被淘汰：Ubuntu 24.04、Fedora 40+ 默认 Wayland，KDE 与 wlroots 系合成器（Sway）只走 Wayland。
+2. **Wayland 比 X11 难得多**：没有全局坐标、没有原生窗口句柄、每个 surface 要自绘、焦点与输入走 `wl_keyboard` / `wl_pointer` / `wl_text_input`。中文输入对应 `wl_text_input` 协议。
+3. **GPU 选 Vulkan**。Wayland 合成器本身就是 Vulkan 路线；OpenGL 3.3 只作老显卡 / 老虚拟机回退。
+4. **系统依赖绕不开**：即使「Zero Dependencies」指无外部 Zig 包，Linux 上仍需 Wayland、Vulkan、FreeType、HarfBuzz、Fontconfig。
+
+#### Zig 生态现状（2026-10-21 核实）
+
+| 项目 | star | 状态 |
+|---|---|---|
+| Gooey | 少量 | 明确标注 **Early Development**，API 仍在变；Metal / Vulkan / WebGPU；WebGPU/WASM 线被 Zig 0.16 上游阻塞 |
+| knots-ui/knots | 51 | 2026-09-27 创建，MIT，immediate-mode |
+| sl4de0day/zigui | 0 | 2026-08-18 创建，MIT，21 个后端 |
+| CeoMatheusDev/NitroUI | 0 | 2026-10-13 创建 |
+| QuaternionWake/qw_gui | 1 | AGPL-3.0，基于 Raylib |
+
+**结论：Zig 没有可用的 GUI 框架生态。** 唯一像样的是 Gooey，且自认早期开发。
+
+#### Zig 本身的优势与代价
+
+优势：`zig cc` 可直接编译 HarfBuzz / FreeType 等 C 库并调用；`@cImport` / `translate-c` 能把 Metal.framework 头文件转成 Zig 绑定；comptime 适合做着色器变体与布局常量；无 GC、单二进制。
+
+代价：框架代码会跟着 Zig 的 breaking change 一起被冲刷（0.16 → 0.17 仍在破坏性演进）；Zig 生态的 GUI 资料极少；一旦自研，你要永久维护字体整形、IME、无障碍、系统集成。
+
+#### 工作量量级
+
+一个「能用」的跨平台原生 GUI 框架，自研到 Gio / egui 现有水平的 80%：
+
+| 阶段 | 熟练小团队 |
+|---|---|
+| 窗口 + GPU 抽象 + 基础输入 | 3–6 个月 |
+| 文本渲染（整形 / CJK / 回退 / 缓存） | 3–6 个月 |
+| 三平台 IME（含中文） | 3–6 个月 |
+| 控件库 + 布局引擎 + 主题 | 6–12 个月 |
+| 打磨到可交付质量 | 6–12 个月 |
+
+期间产品功能零进展。而这正是问题所在：SelaDB 的核心竞争力在数据模型、查询、协议、Agent 集成，不在渲染管线。
+
+#### 关键判断
+
+自研框架解决的是「渲染保真度」问题，但代价是**全部其他维度**。而且**保真度不会因此变成 100%** —— 自研框架同样没有 CSS 引擎，你依然要手写布局与绘制，只是从「调用现成 API」变成「自己实现 API」。
+
+真正的解法是**把设计源与实现解耦**（design token + 黄金图回归），而不是换一个更底层的框架。
+
 ---
 
 ## 4. 根本矛盾：原生 GPU 渲染 与 100% 复刻 Web 设计稿 不可兼得
