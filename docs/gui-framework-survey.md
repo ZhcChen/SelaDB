@@ -181,13 +181,13 @@ Go 二进制作为「引擎」被 GUI 拉起，两边共用同一份协议定义
 
 | 维度 | 实现 |
 |---|---|
-| 布局 | **Taffy 0.13**，features 开启 `flexbox` / `grid` / `block_layout` / `float_layout` / `content_size` —— 与浏览器同源的 CSS 布局算法集 |
+| 布局 | **Taffy 0.9.0**（gpui 0.2.2 精确锁定），默认 features 开启 `flexbox` / `grid` / `block_layout` / `content_size` —— 与浏览器同源的 CSS 布局算法集（**无 float 布局**） |
 | 渲染 | macOS **Metal**（`gpui_macos`）、Windows **D3D12/Vulkan**（`gpui_windows`）、Linux **Vulkan**（`gpui_linux`）、另有 `gpui_wgpu`、`gpui_web` |
 | 绘制 | `lyon`（路径）、`resvg`/`usvg`（SVG）、阴影、透明度、pattern |
-| 字体 | `font-kit`（Zed 的 fork，跨平台系统字体发现）+ `ttf-parser` + `swash`（HarfBuzz 移植） |
+| 字体 | `zed-font-kit`（Zed 的 font-kit fork，跨平台系统字体发现）+ `cosmic-text 0.14`（内含 `fontdb` + `rustybuzz` 整形） |
 | 无障碍 | `accesskit` |
 | 平台 | `gpui_macos` / `gpui_linux` / `gpui_windows` / `gpui_apple` / `gpui_ios` / `gpui_web` |
-| 可测试 | `toggle_headless` 无头示例 + `platform/visual_test.rs` 截图对比 |
+| 可测试 | `test-support` feature：无头布局测量（`debug_bounds` 读元素几何）。**无截图 API**（初稿记为「`toggle_headless` + `platform/visual_test.rs` 截图对比」，经核实 gpui 0.2.2 无此二者） |
 
 API 是 builder 风格，形如 Tailwind 的 utility class：
 
@@ -198,7 +198,7 @@ div().flex().flex_col().gap_3().bg(rgb(0x505050)).size(px(500.))
    .child(...)
 ```
 
-官方示例里直接有 `uniform_list`（虚拟化列表）、`grid_layout`、`tree`、`text`、`text_wrapper`、`shadow`、`svg`、`a11y`、`toggle_headless` —— 对数据库工具来说该有的骨架都有。
+官方示例里直接有 `data_table`（473 行数据表）、`uniform_list`（虚拟化列表）、`grid_layout`、`tree`、`text`、`text_layout`、`text_wrapper`、`shadow`、`gradient`、`svg` —— 对数据库工具来说该有的骨架都有。（初稿还列了 `a11y` 与 `toggle_headless` 两个示例，核实 gpui 0.2.2 **并无这两个文件**。）
 
 #### 许可证：gpui 本体可独立使用，Zed 的应用层组件不可用
 
@@ -298,7 +298,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 **能做到的**：
 
-- 布局层面 **Taffy 与浏览器同源**，Flexbox / Grid / Block / Float 的语义、盒模型、gap、aspect-ratio 都能对上
+- 布局层面 **Taffy 与浏览器同源**，Flexbox / Grid / Block 的语义、盒模型、gap、aspect-ratio 都能对上；**已实测等价**（几何 0.000px、字宽 ≤0.014px，见 [`fidelity-measurement.md`](fidelity-measurement.md)）
 - 视觉属性：圆角、阴影、渐变、边框、透明度、SVG 图标都有
 - 字体：系统字体发现 + swash 整形，CJK 覆盖没问题
 - API 形态接近 Tailwind，设计稿的 utility 风格可一对一手写
@@ -333,7 +333,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 这是整个选型里最需要摊开讲的一点。
 
-**原生渲染框架不是浏览器，没有 CSS 引擎。** GPUI 已经是四者里最接近的（Taffy 同源算法 + Tailwind 风格 API），也只到 90–95%。Gio 更早一层（布局是自研的 flex/absolute/flexible space，没有 grid 布局）。
+**原生渲染框架不是浏览器，没有 CSS 引擎。** GPUI 已经是四者里最接近的（Taffy 同源算法 + Tailwind 风格 API），且这一层**已实测**（布局几何与文字度量与 Chromium 等价，差异只剩像素栅格化与被禁用的 CSS 特效）。Gio 更早一层（布局是自研的 flex/absolute/flexible space，没有 grid 布局）。
 
 但要注意一个常被忽略的事实：**WebView 本身也是 GPU 加速渲染的**。WKWebView、WebView2、WebKitGTK 的网页合成都在 GPU 上跑。所谓「原生 GPU 渲染」与「WebView」的区别不是「GPU vs CPU」，而是「你自己写绘制代码 vs 浏览器替你画」。
 
@@ -341,7 +341,8 @@ use: xcodebuild -downloadComponent MetalToolchain
 |---|---|---|---|---|---|
 | Web（系统 webview） | **100%** | 10–20MB | 中 | 中 | Go + Web |
 | Web（Electron 捆绑 Chromium） | 100% | 100MB+ | 高 | 慢 | Go/Rust + Web |
-| 原生（Gio / Ebiten / GPUI） | 70–95% | 10–20MB | 低 | 快 | 纯 Go 或 Go+Rust |
+| 原生（GPUI） | 布局/字宽实测等价，栅格化有差异 | 10–20MB | 低 | 快 | 纯 Rust |
+| 原生（Gio / Ebiten） | 70–95% | 10–20MB | 低 | 快 | 纯 Go |
 
 所以真正的取舍是：**「100% 复刻设计稿」和「纯 Go 单语言栈 + 极致轻快」，二选一。**
 
@@ -351,7 +352,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 1. **设计源定成 design token 文件**（颜色 / 间距 / 字号 / 圆角 / 阴影 / 动效时长），而不是 HTML。HTML 只作为可视化草图与交互原型
 2. token 用一份 JSON/YAML 描述，Go 侧和前端侧共用同一份 → 翻译是机械映射，不会漂移
-3. **像素级回归用黄金图**：Gio 的 `unit` 包、GPUI 的 `visual_test.rs`、egui 的 `egui_kittest` 都能在无头环境截图。把「设计稿渲染图」与「实现截图」做像素 diff，就能量化还原度并防止回归
+3. **像素级回归用黄金图**：Gio 的 `unit` 包、egui 的 `egui_kittest` 都能在无头环境截图；**GPUI 0.2.2 没有截图 API**，需要自建抓图链路（真机窗口 + `screencapture`）。把「设计稿渲染图」与「实现截图」做像素 diff，就能量化还原度并防止回归
 
 第 3 点尤其值得做 —— 它把「还原度」从主观感受变成可测量的数字。
 
@@ -381,11 +382,11 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 修正后 GPUI 的优势是全部候选里最完整的：
 
-- **Taffy = 浏览器同源的 Flexbox + Grid + Block + Float 全套** → 唯一能直接映射 CSS Grid 的方案
+- **Taffy = 浏览器同源的 Flexbox + Grid + Block 全套** → 唯一能直接映射 CSS Grid 的方案（实测几何等价）
 - **官方 473 行数据表参考实现**（Apache-2.0）→ 固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条
 - **完整逐平台 IME**（Cocoa `NSTextInput` / Wayland / X11）→ Zed 生产验证
 - **实测独立可用**，产物 5.6M，真增量 0.99s
-- 公司维护、版本稳定、无头模式 + 截图对比测试
+- 公司维护、版本稳定、无头布局测量（`debug_bounds`）
 
 代价（仍然成立）：macOS 构建需装 Metal Toolchain 组件（838MB，CI 也要预装）、交叉编译 Windows 需 mingw-w64、**独立生态规模小**（gpui 38 万下载 vs egui 2722 万 —— 因为 Zed 内部走 path 依赖，第三方参考资料少）。
 

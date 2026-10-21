@@ -27,7 +27,9 @@
 
 ### 2.1 布局层与浏览器同源
 
-GPUI 用 **Taffy 0.13**，features 开启 `flexbox` / `grid` / `block_layout` / `float_layout` / `content_size` —— 这是浏览器的 CSS 布局算法集，**不是仿写，是同一套实现**。
+GPUI 用 **Taffy 0.9.0**（gpui 0.2.2 以 `=0.9.0` 精确锁定），默认 features 开启 `flexbox` / `grid` / `block_layout` / `content_size` —— 这是浏览器的 CSS 布局算法集，**不是仿写，是同一套实现**。
+
+> Taffy 0.9 **没有 float 布局**（样式枚举里不存在 Float），CSS `float` 不在可映射范围。
 
 这意味着设计稿的布局可以近乎直接映射：
 
@@ -37,7 +39,8 @@ GPUI 用 **Taffy 0.13**，features 开启 `flexbox` / `grid` / `block_layout` / 
 | `display: grid` + `grid-template-columns` | Taffy 的 grid 支持，**唯一能直接映射 CSS Grid 的候选** |
 | `position: absolute` | `layout.Stack` |
 | `padding` / `margin` / `border` / `box-sizing` | 完整支持 |
-| `float` / `block` 流式布局 | Taffy 支持 |
+| `block` 流式布局 | Taffy `block_layout` 支持 |
+| `float` 浮动布局 | ❌ Taffy 0.9 不支持 |
 
 API 形态接近 Tailwind 的 utility class，设计稿的规整布局能一对一手写。
 
@@ -234,7 +237,9 @@ gpui 本身不含语法高亮。两种选择：
 
 ## 7. 还原度策略
 
-GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原生方案里最高的。配合设计规范约束，可达 98–99% 视觉等价。
+GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原生方案里最高的。
+
+**这一点已经实测过**（见 [`fidelity-measurement.md`](fidelity-measurement.md)）：同一棵布局树在 Chromium 与 GPUI 上的 70 个几何测量值**逐位相同（最大偏差 0.000px）**，6 段中英混排文本的排版宽度**亚像素一致（最大偏差 0.014px）**。
 
 **设计规范禁用清单**（Taffy / gpui 不支持或不等价的）：
 
@@ -251,11 +256,11 @@ GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原�
 
 ### 7.1 黄金图回归
 
-gpui 有 `visual_test.rs` 截图对比与 `toggle_headless` 无头模式。流程：
+gpui 0.2.2 **没有截图 API**（无 `visual_test.rs`、无 `screenshot()`、无 `toggle_headless`），测试设施只提供几何量（`debug_bounds`），**不产出像素**。所以黄金图回归要自己搭一条抓图链路：
 
 1. `design/screenshots/` 存设计稿导出的 PNG
-2. 实现截图 → 与基准做像素 diff
-3. 设阈值（SSIM ≥ 0.98）进 CI
+2. 真机窗口渲染 → `screencapture -x -R<x,y,w,h>` 抓图（Retina 下是 2x）
+3. 与基准做像素 diff（SSIM ≥ 0.98）进 CI
 
 **这把还原度从主观感受变成 CI 里可测量的数字。** 详见 [`ui-fidelity.md`](ui-fidelity.md)。
 
@@ -271,7 +276,9 @@ gpui 有 `visual_test.rs` 截图对比与 `toggle_headless` 无头模式。流�
 | **Zed 应用层组件 GPL 不可用** | 少一批现成控件 | 只用 Apache-2.0 部分；data_table 有参考实现 |
 | **冷编译 76s** | CI 慢 | 配 cargo 缓存；日常增量 0.99s 可接受 |
 | **gpui 由 Zed 单方面演进** | API 可能破坏 | 锁版本，按季评估升级；gpui 一年一版，升级频率天然低 |
-| **Text 排版细节与浏览器有差** | 像素级无法一致 | 黄金图阈值留余量；中英混排换行由 Taffy + gpui 文本系统保证基本一致 |
+| **Text 排版细节与浏览器有差** | 像素级无法一致 | 实测**字宽与换行宽度已等价**（≤0.014px），差异只在栅格化；黄金图阈值留余量 |
+| **gpui 无截图 API** | 黄金图回归要自建抓图链路 | 真机窗口 + `screencapture`；或后续给 gpui 补一层 readback |
+| **gpui 测试平台无字体** | 依赖字体的断言无法在单测里跑 | `test-support` 用 `NoopTextSystem`；字体相关断言放到真机端到端测试 |
 
 ---
 

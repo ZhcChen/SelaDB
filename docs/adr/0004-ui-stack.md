@@ -60,12 +60,14 @@ CLI 与 MCP 的选型不受 GUI 决策影响（见 ADR-0003）。GUI 选型的�
 
 ## 为什么是 GPUI
 
-1. **布局层与浏览器同源**。Taffy 0.13 开启 `flexbox` / `grid` / `block_layout` / `float_layout` / `content_size` —— 浏览器的 CSS 布局算法集，**唯一能直接映射 CSS Grid 的方案**，还原度天花板最高
+1. **布局层与浏览器同源**。Taffy 0.9.0（gpui 0.2.2 以 `=0.9.0` 精确锁定）默认开启 `flexbox` / `grid` / `block_layout` / `content_size` —— 浏览器的 CSS 布局算法集，**唯一能直接映射 CSS Grid 的方案**，还原度天花板最高。后续实测：同一棵布局树在 Chromium 与 GPUI 上的几何值逐位相同（0.000px），中英混排字宽亚像素一致（≤0.014px），见 [`fidelity-measurement.md`](../fidelity-measurement.md)
 2. **官方提供 Apache-2.0 的数据表参考实现**。`examples/data_table.rs`（473 行）已实现固定表头、`uniform_list` 虚拟化、列宽、截断、自定义滚动条、可见范围追踪
 3. **完整逐平台 IME**。macOS 走 Cocoa `NSTextInput` 协议（`set_marked_text` / `insert_text` / `marked_text_range`），Wayland 与 X11 集成 `marked_text_range()`。Zed 是编辑器，中文输入是刚需，生产验证过
 4. **可完全独立使用**。`gpui` 本体 Apache-2.0，全部依赖已发布到 crates.io（`gpui_collections` / `gpui_http_client` / `gpui-macros` / `gpui_util` / `gpui_util_macros` / `blade-graphics`）。实测：空项目仅依赖 crates.io，独立构建成功，产物 5.6M，链接 `Metal.framework` + `QuartzCore.framework`
 5. **版本稳定，可正常锁版本**。0.2.0 / 0.2.1 / 0.2.2 全发布于 2025-10，之后一年无新版本 —— 一年一版，计划性升级
-6. **公司维护**（Zed Industries），且有 `visual_test.rs` 截图对比与 `toggle_headless` 无头模式做 UI 回归
+6. **公司维护**（Zed Industries），且提供 `test-support` 无头测量（`debug_bounds` 读元素几何），UI 回归可据此做几何断言
+
+> **修正记录（2026-10-21 实测后）**：本 ADR 初稿称 gpui「有 `visual_test.rs` 截图对比与 `toggle_headless` 无头模式」，经核实 **gpui 0.2.2 并不存在这两个 API** —— 测试设施只产出几何量，不产出像素。黄金图回归需自建抓图链路（真机窗口 + `screencapture`）。此修正不影响选型结论（该项当时是加分项而非决定项）。
 
 ## 编译速度：实测结论
 
@@ -90,7 +92,7 @@ Rust 慢的是**冷编译**，只在新克隆、CI 无缓存、依赖升级时�
 - **GUI 不做跨平台交叉编译**，各平台原生构建
 - **独立生态规模小**。gpui 38 万下载 vs egui 2722 万 —— 因为 Zed 内部走 path 依赖。第三方参考资料少，遇问题主要靠读 Zed 源码
 - **gpui 由 Zed 单方面演进**，API 可能破坏。锁版本、按季评估升级（一年一版的节奏使这可行）
-- **还原度不是 100%，是 98–99% 视觉等价**。需要设计规范约束（禁用 CSS 滤镜/混合模式/复杂 mask/伪元素），并用黄金图回归把还原度做成 CI 里可测量的指标。详见 [`ui-fidelity.md`](../ui-fidelity.md)
+- **还原度不是 100%，是 98–99% 视觉等价**。需要设计规范约束（禁用 CSS 滤镜/混合模式/复杂 mask/伪元素/float），并用黄金图回归把还原度做成 CI 里可测量的指标。布局几何与文字度量已实测等价（0.000px / ≤0.014px），剩余差异集中在像素栅格化。详见 [`ui-fidelity.md`](../ui-fidelity.md) 与 [`fidelity-measurement.md`](../fidelity-measurement.md)
 
 ---
 
@@ -112,6 +114,6 @@ GUI 采用 `gioui.org` v0.10.3。理由：macOS 走 Metal、Windows 走 D3D11、
 
 ### 第三版：GPUI（下午，最终）
 
-**变更原因**：GPUI 同时解决上述三个问题 —— Taffy 提供与浏览器同源的 Flexbox **+ Grid + Block + Float** 全套；gpui 有 `shadow` 能力（官方 `examples/shadow.rs`）与渐变（`examples/gradient.rs`）；且 gpui 是**正常发布的 crate，一年一版，可以锁版本**，与 Gio 的 0.x 政策相反。
+**变更原因**：GPUI 同时解决上述三个问题 —— Taffy 提供与浏览器同源的 Flexbox **+ Grid + Block** 全套；gpui 有 `shadow` 能力（官方 `examples/shadow.rs`）与渐变（`examples/gradient.rs`）；且 gpui 是**正常发布的 crate，一年一版，可以锁版本**，与 Gio 的 0.x 政策相反。
 
 同时实测确认：gpui 独立构建成功、产物 5.6M、真增量 0.99s、中文 IME 完整、官方 473 行数据表参考实现可用。

@@ -91,7 +91,7 @@ Rust 慢的是**冷编译**，只在新克隆、CI 无缓存、依赖大版本�
 
 读 Gio 源码后发现三个问题：① `layout/` 下只有 `flex.go` / `stack.go` / `list.go`，**没有 CSS Grid**，而数据表格的经典布局正是 Grid；② **没有任何阴影原语**，而 `box-shadow` 在现代设计里很常见；③ 官方 tag 政策是「pre-1.0 tags 仅供参考，不指定有持续支持的版本，bugfix 不会回移」，**等于不能锁版本，必须跟 main**。
 
-而 Rust 侧的 **GPUI 同时解决这三个问题**：Taffy 提供与浏览器同源的 Flexbox + Grid + Block + Float 全套；gpui 有原生 `BoxShadow` 与 `linear_gradient()`；且 gpui 是**正常发布的 crate，一年一版，可以锁版本**。
+而 Rust 侧的 **GPUI 同时解决这三个问题**：Taffy 提供与浏览器同源的 Flexbox + Grid + Block 全套；gpui 有原生 `BoxShadow` 与 `linear_gradient()`；且 gpui 是**正常发布的 crate，一年一版，可以锁版本**。
 
 同时，实测证明「Rust 编译慢」这一选型前提不成立（增量 0.62–0.99s，与 Go 持平）。
 

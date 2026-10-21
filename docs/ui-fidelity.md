@@ -25,7 +25,7 @@
 
 下面以两个方案的实际源码为对照，给出「哪些 CSS 特性能被 1:1 映射」的边界：
 
-- **GPUI v0.2.2**（当前选定）—— Taffy 提供 Flexbox + Grid + Block + Float 全套，原生 `BoxShadow` 与 `linear_gradient()`
+- **GPUI v0.2.2**（当前选定）—— Taffy 0.9 提供 Flexbox + Grid + Block 全套（**无 float**），原生 `BoxShadow` 与 `linear_gradient()`
 - **Gio v0.10.3**（备选）—— 布局只有 Flex，`op/paint` 与 `op/clip` 里连阴影原语都没有
 
 ### 2.1 GPUI v0.2.2 的能力（从源码核实）
@@ -34,9 +34,10 @@
 
 | CSS 能力 | GPUI 实现 | 位置 |
 |---|---|---|
-| Flexbox 布局 | Taffy `flexbox` feature | 依赖 `taffy 0.13` |
+| Flexbox 布局 | Taffy `flexbox` feature | 依赖 `taffy =0.9.0`（gpui 0.2.2 精确锁定） |
 | **CSS Grid 布局** | Taffy `grid` feature | 同上 |
-| Block / Float 流式布局 | Taffy `block_layout` / `float_layout` | 同上 |
+| Block 流式布局 | Taffy `block_layout` | 同上 |
+| ~~Float 浮动布局~~ | ❌ Taffy 0.9 不支持，CSS `float` 不可映射 | — |
 | content-size 尺寸计算 | Taffy `content_size` | 同上 |
 | 盒模型 padding / margin / border | 完整 | `style.rs` |
 | **box-shadow** | 原生 `BoxShadow` + `.shadow(vec![BoxShadow{..}])` | `style.rs:308` |
@@ -45,9 +46,12 @@
 | 圆角 | 样式系统 | — |
 | SVG / 矢量路径 | 渲染层 | — |
 | 文本整形与换行 | 自己的文本栈 | `text_system.rs` |
-| 系统字体发现 | `font-kit`（Zed 的 fork，跨平台） | 默认 feature |
+| 系统字体发现 | `zed-font-kit`（Zed 的 font-kit fork，跨平台） | 默认 feature |
+| 文本整形 | `cosmic-text 0.14`（内含 `fontdb` + `rustybuzz`） | macOS / Linux |
 
-**布局这一项是 GPUI 的决定性优势**：Taffy 用的就是浏览器的 CSS 布局算法集，Flexbox / Grid / Block / Float 全部覆盖，语义与浏览器一致。数据表格的经典布局（表头固定 + 主体滚动 + 横向滚动 + 列宽可调）正是 CSS Grid 的典型用法，GPUI 能直接映射，Gio 不能。
+**布局这一项是 GPUI 的决定性优势**：Taffy 用的就是浏览器的 CSS 布局算法集，Flexbox / Grid / Block 全部覆盖，语义与浏览器一致。数据表格的经典布局（表头固定 + 主体滚动 + 横向滚动 + 列宽可调）正是 CSS Grid 的典型用法，GPUI 能直接映射，Gio 不能。
+
+> **这一条已经实测过**，不是推断：同一棵布局树在 Chromium 与 GPUI 上测出的 70 个几何值**逐位相同**，6 段中英混排文本的宽度**亚像素一致**。数据与复现步骤见 [`fidelity-measurement.md`](fidelity-measurement.md)。
 
 **Gio 的对照**：其 `layout/` 下只有 `flex.go` / `stack.go` / `list.go`，**没有 Grid**；`op/paint` 与 `op/clip` 里也**没有任何阴影原语**（material 里唯一的 "shadow" 是 switch 滑块用半透明圆盘近似）。Gio 的文本换行走 go-text/typesetting（HarfBuzz + CSS UAX #14 + bidi），与浏览器同源 —— 这一项它做得好。
 
@@ -91,6 +95,8 @@
 
 这套规则做进 Figma 的组件库和 design token 后，**设计稿天然就落在 GPUI 可映射的子集里**。此时还原度可以做到 **98–99%** —— 剩下的 1–2% 是字体光栅化的亚像素差异，人眼不可辨。
 
+> 实测口径的更新：布局几何与文字度量已验证为**等价**（0.000px / ≤0.014px），所以「98–99%」不再是估计，而是「除栅格化与被禁用的 CSS 特效外，其余部分完全等价」。
+
 ### 做法二：设计源用 token，不用 HTML
 
 ```
@@ -107,12 +113,12 @@ design/
 
 ### 做法三：还原度用黄金图度量
 
-gpui 有 `platform/visual_test.rs` 截图对比与 `toggle_headless` 无头模式。
+gpui 0.2.2 **没有截图 API** —— 无 `platform/visual_test.rs`、无 `screenshot()`、无 `toggle_headless`。测试设施（`test-support`）只提供几何量 `debug_bounds`，不产出像素。
 
 流程：
 
 1. 从设计稿导出 PNG（`design/screenshots/`）
-2. 实现截图 → PNG
+2. 真机窗口渲染 → `screencapture -x -R<x,y,w,h>` 抓图 → PNG
 3. 两者做像素 diff（SSIM 或感知哈希）
 4. 设阈值（如 SSIM ≥ 0.98）进 CI
 
@@ -139,26 +145,30 @@ GPUI 官方 `examples/data_table.rs` 给出的实现路线是：表头与 `unifo
 | 成本 | 说明 |
 |---|---|
 | 人工翻译层 | CSS → GPUI 的映射是人工的，没有自动化工具 |
-| 像素差异 | 字体光栅化永远不一致，黄金图阈值要留余量 |
+| 像素差异 | 字体光栅化永远不一致，黄金图阈值要留余量（**布局与字宽已实测等价**，见 [`fidelity-measurement.md`](fidelity-measurement.md)） |
+| 抓图链路自建 | gpui 0.2.2 无截图 API，黄金图要靠 `screencapture` 自建链路 |
+| 字体相关断言 | gpui 测试平台无字体，列宽 / 截断 / 换行类断言要放真机端到端 |
 | 交互状态 | CSS 的 `:hover` / `:focus` / `:active` 要逐个映射成 gpui 的 `interactivity` 回调 |
 | 字体回退 | 需确认目标平台的系统中文字体覆盖情况与设计稿一致 |
+| CSS `float` | Taffy 0.9 不支持，设计稿禁用浮动布局 |
 | 列宽拖拽 | 官方示例是固定列宽，拖拽调整需自建 |
 | 双轴滚动同步 | 表头与主体的横向偏移需手动同步 |
+| 滚动容器要显式声明 | `overflow:visible` 的 flex item 有 min-content 地板，翻译时必须给 `overflow_hidden()` / `overflow_scroll()` |
 
 ---
 
 ## 6. 与 Web 路线的对比（同一张设计稿）
 
-| 维度 | 原生（Gio） | Web（系统 webview） |
+| 维度 | 原生（GPUI） | Web（系统 webview） |
 |---|---|---|
-| 视觉等价度 | 98–99%（约束设计规范后） | 100% |
+| 视觉等价度 | 布局与字宽**实测等价**，栅格化有差异（约束设计规范后） | 100% |
 | 像素一致 | 不可能 | 也不保证（跨浏览器仍有差异） |
-| 黄金图回归 | ✅ Gio `unit` | ✅ 浏览器截图，同样可行 |
-| 设计约束 | 必须禁用 Grid / 阴影 / 滤镜 | 无 |
+| 黄金图回归 | ⚠️ 需自建抓图链路（gpui 无截图 API） | ✅ 浏览器截图，直接可用 |
+| 设计约束 | 必须禁用 滤镜 / 混合模式 / 伪元素 / float | 无 |
 | 产物体积 | 10–20MB | 10–20MB |
 | 内存占用 | 低 | 中（浏览器渲染进程） |
 | 启动速度 | 快 | 中 |
-| 语言栈 | 纯 Go | Go + Web |
+| 语言栈 | 纯 Rust | Go + Web |
 | 中文 IME | 协议级完整实现 ✅ | 天然正确 ✅ |
 
 **结论：两条路都能做到「人眼分辨不出」的还原度。** 差别在于原生路线要你接受一份「禁用清单」，Web 路线不用。

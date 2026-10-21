@@ -50,7 +50,7 @@ SelaDB 采用「一个核心，多种外壳」的结构。核心库负责所有�
 
 | 用途 | 选型 | 版本 | 理由 |
 |---|---|---|---|
-| GUI 框架 | `gpui` | 0.2.2 | Taffy 与浏览器同源（Flexbox+Grid+Block+Float）；Metal / D3D12 / Vulkan；Apache-2.0 且全部依赖已发布；**实测可独立构建**（产物 5.6M） |
+| GUI 框架 | `gpui` | 0.2.2 | Taffy 0.9 与浏览器同源（Flexbox+Grid+Block，**无 float**）；Metal / D3D12 / Vulkan；Apache-2.0 且全部依赖已发布；**实测可独立构建**（产物 5.6M）；**布局与字宽与 Chromium 实测等价** |
 | GUI 组件 | 自建，参考官方 `examples/data_table.rs` | — | 官方提供 473 行数据表参考实现：固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条 + 可见范围追踪 |
 | 语法高亮 | `tree-sitter` + `tree-sitter-sql` | — | 增量解析，可拿语法树做表名/列名跳转 |
 | CLI 框架 | `clap` | 4.6.7 | 事实标准 |
@@ -294,7 +294,9 @@ tag 触发
 | **冷编译慢**（gpui 约 76s） | CI 慢 | 配 cargo 缓存；日常增量 0.99s 可接受 |
 | **gpui 由 Zed 单方面演进** | API 可能破坏 | 锁版本、按季评估升级（一年一版，升级频率天然低） |
 | **gpui 独立生态规模小**（38 万下载） | 第三方参考资料少 | 官方示例质量高；组件自建为主 |
-| **设计稿无法 100% 像素复刻** | 还原度打折 | 约束设计规范 + design token + 黄金图回归，见 [`ui-fidelity.md`](ui-fidelity.md) |
+| **设计稿无法 100% 像素复刻** | 还原度打折 | 约束设计规范 + design token + 黄金图回归，见 [`ui-fidelity.md`](ui-fidelity.md)；布局与字宽已实测等价，见 [`fidelity-measurement.md`](fidelity-measurement.md) |
+| **gpui 无截图 API** | 黄金图回归缺现成能力 | 自建抓图链路（真机窗口 + `screencapture`） |
+| **gpui 测试平台无字体** | 字体相关断言无法进单测 | 列宽 / 截断 / 换行类断言放真机端到端测试 |
 | **Oracle 驱动成熟度** | 特性覆盖有限 | 列为「尽力而为」支持等级，不承诺完整 SQL 方言 |
 | **rusqlite 需 C 编译器** | 构建环境要求 | Rust 本就需要平台链接器，不构成额外负担 |
 
