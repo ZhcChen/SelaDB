@@ -328,6 +328,92 @@ Figma 的 auto layout 用的就是 flex（更早的 "text layout" 才是绝对�
 | 允许 inline 混排 | 50–70%（那是浏览器的复杂度） |
 | **按上述条款禁用** | **99–100%** |
 
+### 8.6 如果真的要实现 inline：可行性与代价
+
+**Rust 能不能实现？** 能。inline formatting context 是纯算法工作，与语言无关，Rust 没有任何障碍。
+
+**能不能参考 Chrome？** 能，而且这是最佳参考。Blink 的 LayoutNG 有专门的
+`third_party/blink/renderer/core/layout/inline/` 目录：
+
+| 事实 | 数据 |
+|---|---|
+| 文件数 | **120** |
+| 总大小 | **1.8 MB**（其中 `.cc`/`.h` 117 个，1788 KB） |
+| 核心文件 | `inline_layout_algorithm.cc`（主算法）、`line_builder.cc`（行盒构建）、`inline_box_state.cc`（60 KB，内联盒状态机）、`inline_item.cc`（文本 run 与原子盒的统一表示） |
+| **必读文档** | 该目录下的 `README.md`（17 KB，LayoutNG inline 算法的完整说明） |
+
+#### 8.6.1 我们有一个 Blink 没有的先天优势
+
+Blink 的 inline 实现里最贵的部分恰恰是**文本测量与断行**，而这部分 cosmic-text 已经做完了：
+
+| Blink 做的事 | 我们的现成件 |
+|---|---|
+| HarfBuzz 整形 | cosmic-text 的 swash（同一个 HarfBuzz 的 Rust 移植） |
+| ICU `LineBreakIterator`（UAX #14） | cosmic-text 自己的 UAX #14 实现 |
+| 行度量（ascent/descent） | cosmic-text 的 `ascent` / `descent` / `max_ascent` |
+| 亚像素字形偏移 | cosmic-text 的 `x_offset` / `y_offset` |
+
+**所以我们要做的是 Blink 剩下的那部分：**
+
+| 任务 | 规模估计 |
+|---|---|
+| 行盒构建（把 inline-level item 序列按断点分组） | 400–700 行 |
+| 跨 item 的断点计算（run 之间、run 与原子盒之间） | 200–400 行 |
+| 基线对齐（inline box 对齐到行基线） | 300–500 行 |
+| `vertical-align` 各种取值 | 150–300 行 |
+| strut（行盒最小高度由父字体决定） | 50 行 |
+| `white-space` 处理（折叠 / pre / nowrap） | 200–400 行 |
+| inline-block 原子盒 + baseline 取自最后一行 | 150–250 行 |
+| **文字绕排浮动元素** | **800–1500 行，最难** |
+| **合计（不含 float）** | **~1500–2500 行** |
+| **合计（含 float）** | **~2500–4000 行** |
+
+单人到小团队：**不含 float 约 2–3 个月，含 float 约 4–6 个月**。
+
+#### 8.6.2 一个必须知道的现实：浏览器之间对 inline 的行为本来就不一致
+
+CSS 2.1 §8.3 与 CSS Inline Layout Module Level 3 —— **规范严重不完整**，Level 3 至今仍是 Working Draft。Chromium、Firefox、WebKit 历史上在很多细节上给出不同结果。
+
+**所以「参考 Chrome ��」得到的��是 Chrome 的行为，不是「CSS 的行为」。** 这在还原度上有实际影响：照 Chrome 实现，Firefox 下的浏览器截图会与我们不一致。
+
+#### 8.6.3 架构上必须现在就留门
+
+inline 要设计成**可插拔的布局算法**，而不是重写整个 layout 层：
+
+```text
+layout/
+├── mod.rs        # 统一入口：按 display 派发到具体算法
+├── flex.rs       # taffy flexbox
+├── grid.rs       # taffy grid
+└── inline/       # 将来：行盒构建 + 基线对齐
+```
+
+同时 **text/ 层的抽象现在就要做对** —— 输出不能只是「一段文字有多高」，而要是「若干行，每行有基线」：
+
+```rust
+struct LineBox {
+    runs: Vec<GlyphRun>,
+    baseline: f32,
+    ascent: f32,
+    descent: f32,
+}
+```
+
+否则将来加 inline 要重写整个 text 层。
+
+#### 8.6.4 值不值得：分两种情况
+
+| 场景 | 结论 |
+|---|---|
+| 框架要通用（将来独立成项目、给外部用） | inline 是**必备**，不做就不是「CSS 框架」。建议做**简化版**：基线对齐 + `vertical-align` + `inline-block`，**明确不支持 float 绕排** —— 覆盖约 95% 实际用法，成本减半 |
+| 框架只服务 SelaDB | **不做**，flex/grid 子集够用 |
+
+**推荐路线**
+
+1. Phase 1 —— flex + grid + 盒模型 + 文本（不做 inline）
+2. Phase 2 —— 加 inline，但只做基线对齐 + `vertical-align` + `inline-block`，**不做 float**
+3. float 绕排 —— 看真实需求，可能永远不做
+
 ---
 
 ## 9. 还原度怎么量
