@@ -1,0 +1,23 @@
+[package]
+name = "gui-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "HTML/CSS 风格的跨平台原生 GUI 框架核心（无业务依赖，可独立成项目）"
+
+[dependencies]
+cssparser = "0.38"
+taffy = "0.15"
+cosmic-text = "0.19"
+glam = "0.34"
+
+# GPU 与窗口是可选后端，核心逻辑不依赖它们
+wgpu = { version = "30", optional = true }
+winit = { version = "0.30", optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+
+[features]
+default = []
+gpu = ["dep:wgpu", "dep:winit", "dep:raw-window-handle"]
+
+[dev-dependencies]
