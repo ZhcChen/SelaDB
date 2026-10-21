@@ -4,42 +4,46 @@ SelaDB —— 跨平台（Windows / macOS / Linux）数据库管理软件。
 
 ## 技术栈（已定，勿随意更换）
 
-全项目 **Go**。GUI 用 Gio 直接走平台原生 GPU 渲染（macOS Metal / Windows D3D11 / Linux Vulkan），不用 WebView。
+全项目 **Rust**。GUI 用 GPUI 直接走平台原生 GPU 渲染（macOS Metal / Windows D3D12 / Linux Vulkan），不用 WebView。
 
 | 层 | 选型 |
 |---|---|
-| CLI 框架 | `spf13/cobra` |
-| CLI 交互界面 | `charmbracelet/bubbletea` v2 + `lipgloss` v2 + `bubbles` v2 |
-| GUI | `gioui.org`（Gio，immediate mode） |
-| MCP | `modelcontextprotocol/go-sdk`（官方 SDK） |
-| 日志 | 标准库 `log/slog` |
+| GUI 框架 | `gpui` v0.2.2（Zed 的框架，Apache-2.0） |
+| GUI 组件 | 自建，参考官方 `examples/data_table.rs` |
+| SQL 语法高亮 | `tree-sitter` + `tree-sitter-sql` |
+| CLI 框架 | `clap` v4.6.7 |
+| MCP | `rmcp` v3.6.0（官方 Rust SDK） |
+| 驱动 | `tokio-postgres` / `sqlx` / `rusqlite` / `redis` / `clickhouse-rs` |
+| 日志 | `tracing` + `tracing-subscriber` |
 
 **完整选型、版本号、构建矩阵见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/gui-architecture.md`](docs/gui-architecture.md)。决策依据见 [`docs/adr/`](docs/adr/)。**
 
 ## 硬约束
 
-1. **核心库 / CLI / MCP Server 保持 `CGO_ENABLED=0`**。这样三平台交叉编译不需要 mingw-w64。GUI 轨道例外：macOS 与 Linux Wayland 需要 cgo（Gio 的平台胶水层），Windows 与 Linux X11 不需要。选纯 Go 替代品：`modernc.org/sqlite`（不用 `mattn/go-sqlite3`）、`sijms/go-ora/v2`（不用 `godror`）、`jackc/pgx/v5`（不用已归档的 `lib/pq`）。
-2. **单 `go.mod` 多 package**，不要拆多个 module。当前没有需要独立发版或隔离依赖的场景。
-3. **业务逻辑只写在 `internal/service/`**。CLI 命令、GUI 界面、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不放业务判断。
-4. **驱动用小接口 + 类型断言**（见 `docs/adr/0005-driver-interfaces.md`）。不要为了省事定义大接口，Redis 实现不了 `ListColumns`。
+1. **Cargo 多 crate 工作区**，不合并成单 crate。GUI 的 `gpui` 依赖很重（含 Metal shader 编译），不能污染 CLI / MCP Server 的构建。
+2. **只依赖宽松许可证的 crate**。Zed 的应用层 crate（`ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu`）是 GPL-3.0-or-later 且未发布，**一律不用**。可用的只有 Apache-2.0 的 `gpui` 及其依赖。
+3. **业务逻辑只写在 `seladb-core/src/service/`**。CLI 命令、GUI 视图、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不放业务判断。
+4. **驱动用小 trait + 能力探测**（见 `docs/adr/0005-driver-interfaces.md`）。不要为了省事定义大 trait，Redis 实现不了 `list_columns`。
 5. **CLI 所有命令必须支持 `--json`**。Skill 包装、MCP 工具、CI 脚本三条路径都依赖它。
-6. **`internal/ui/` 之外禁止 import `gioui.org`**。Gio 处于 0.x，官方不承诺回移 bugfix、每次 minor 升级都是破坏性变更。把 Gio 关在一个包里，升级时只改一处。
-
-## 加新引擎时
-
-在 `internal/driver/<engine>/` 建包，实现 `driver.Driver` + 最小必要的能力接口，在 `init()` 里 `driver.Register(...)`，然后在 `docs/engine-support.md` 记录支持到哪一档。只实现引擎真正支持的能力，不要用「永远返回错误」的方法凑接口。
+6. **gpui 的调用收敛在 `seladb-gui` crate 内**，不外泄到 `core` / `driver` / `service`。
+7. **macOS GUI 构建需要 Metal Toolchain 组件**。`xcodebuild -downloadComponent MetalToolchain`（838.9 MB）。CI 的 macOS runner 必须预装，否则构建直接失败。
 
 ## 目录约定
 
 ```
-cmd/seladb/          CLI 入口        cmd/seladb-mcp/   MCP Server 入口
-internal/core/       领域模型        internal/driver/  引擎抽象与实现
-internal/query/      查询与结果集    internal/service/ 用例编排（业务逻辑落点）
-internal/session/    连接与凭据      internal/tui/     Bubble Tea 界面
-pkg/seladb/          对外稳定 API（变更需走 ADR）
+crates/seladb-core/     领域模型、驱动、查询、服务编排
+crates/seladb-cli/      CLI 入口（clap）
+crates/seladb-mcp/      MCP Server 入口
+crates/seladb-gui/      GUI 入口（gpui）
+design/tokens.json      唯一设计源：颜色/间距/字号/圆角/阴影/动效
+docs/                   架构文档与 ADR
 ```
 
-`internal/` 可自由重构；`pkg/seladb/` 是兼容契约，改动要写 ADR。
+`seladb-core` 内部再分：`core/`（领域模型）、`driver/`（引擎抽象与实现）、`query/`（查询与结果集）、`session/`（连接与凭据）、`service/`（业务逻辑落点）、`config/`（配置加载）。
+
+## 加新引擎时
+
+在 `seladb-core/src/driver/<engine>/` 建模块，实现 `Driver` + 最小必要的能力 trait，在初始化时注册，然后更新 `docs/engine-support.md` 记录支持到哪一档。只实现引擎真正支持的能力，不要用「永远返回错误」的方法凑接口。
 
 ## 提交与规范
 

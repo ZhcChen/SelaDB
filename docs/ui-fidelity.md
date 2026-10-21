@@ -21,42 +21,49 @@
 
 ---
 
-## 2. Gio v0.10.3 的实际能力清单
+## 2. 原生渲染框架的 CSS 映射能力
 
-以下逐项从源码核实（`layout/`、`op/paint/`、`op/clip/`、`text/`、`fontscan`）。
+下面以两个方案的实际源码为对照，给出「哪些 CSS 特性能被 1:1 映射」的边界：
 
-### 2.1 能 1:1 映射的
+- **GPUI v0.2.2**（当前选定）—— Taffy 提供 Flexbox + Grid + Block + Float 全套，原生 `BoxShadow` 与 `linear_gradient()`
+- **Gio v0.10.3**（备选）—— 布局只有 Flex，`op/paint` 与 `op/clip` 里连阴影原语都没有
 
-| CSS 能力 | Gio 实现 | 位置 |
+### 2.1 GPUI v0.2.2 的能力（从源码核实）
+
+### 2.2 能 1:1 映射的
+
+| CSS 能力 | GPUI 实现 | 位置 |
 |---|---|---|
-| Flexbox 布局 | `layout/flex.go`，含 gap / 主轴对齐 / 交叉轴对齐 / 换行 | `layout/` |
-| 绝对定位 | `layout/stack.go` | `layout/` |
-| 盒模型 padding / margin / border | 完整 | `layout/flex.go` |
-| 纯色填充 | `paint.Fill` / `paint.FillShape` | `op/paint/paint.go` |
-| 线性渐变 | `paint.LinearGradientOp`（着色器类型 `TypeLinearGradient`） | `op/paint/paint.go` |
-| 图片 | `paint.NewImageOp` | `op/paint/paint.go` |
-| 透明度 | `paint.PushOpacity` | `op/paint/paint.go` |
-| 矢量路径 | `clip.Path`：Move / Line / Quad / Cube / Arc / Close | `op/clip/clip.go` |
-| 描边 / 轮廓 | `clip.Stroke` / `clip.Outline` | `op/clip/clip.go` |
-| 圆角矩形 | `clip.UniformRRect`（四角同半径） | `op/clip/shapes.go` |
-| **文本换行算法** | go-text/typesetting：HarfBuzz 整形 + **CSS UAX #14 换行** + bidi | `text/` |
-| 系统字体发现 + 缺字回退 | fontscan 纯 Go 跨平台 + 字形覆盖率查询 | `text/` |
+| Flexbox 布局 | Taffy `flexbox` feature | 依赖 `taffy 0.13` |
+| **CSS Grid 布局** | Taffy `grid` feature | 同上 |
+| Block / Float 流式布局 | Taffy `block_layout` / `float_layout` | 同上 |
+| content-size 尺寸计算 | Taffy `content_size` | 同上 |
+| 盒模型 padding / margin / border | 完整 | `style.rs` |
+| **box-shadow** | 原生 `BoxShadow` + `.shadow(vec![BoxShadow{..}])` | `style.rs:308` |
+| **线性渐变** | `.bg(linear_gradient(..))` | `examples/gradient.rs` |
+| 透明度 | 样式系统 | — |
+| 圆角 | 样式系统 | — |
+| SVG / 矢量路径 | 渲染层 | — |
+| 文本整形与换行 | 自己的文本栈 | `text_system.rs` |
+| 系统字体发现 | `font-kit`（Zed 的 fork，跨平台） | 默认 feature |
 
-**文本这一项值得单独强调**：Gio 的换行与整形走的是 go-text/typesetting，其中换行规则实现的是 CSS 的 UAX #14，**与浏览器同源**。中英混排的断行位置、标点避头尾、连字与字距都能对上浏览器。这是原生方案里最难补齐的一块，而 Gio 恰好有。
+**布局这一项是 GPUI 的决定性优势**：Taffy 用的就是浏览器的 CSS 布局算法集，Flexbox / Grid / Block / Float 全部覆盖，语义与浏览器一致。数据表格的经典布局（表头固定 + 主体滚动 + 横向滚动 + 列宽可调）正是 CSS Grid 的典型用法，GPUI 能直接映射，Gio 不能。
 
-### 2.2 缺口的
+**Gio 的对照**：其 `layout/` 下只有 `flex.go` / `stack.go` / `list.go`，**没有 Grid**；`op/paint` 与 `op/clip` 里也**没有任何阴影原语**（material 里唯一的 "shadow" 是 switch 滑块用半透明圆盘近似）。Gio 的文本换行走 go-text/typesetting（HarfBuzz + CSS UAX #14 + bidi），与浏览器同源 —— 这一项它做得好。
 
-| CSS 能力 | Gio 现状 | 补齐成本 |
+### 2.3 缺口的
+
+| CSS 能力 | GPUI 现状 | 补齐成本 |
 |---|---|---|
-| **CSS Grid 布局** | ❌ `layout/` 下只有 flex / stack / list，**没有 Grid** | **高** —— 要自己实现 Grid 布局算法 |
-| **box-shadow** | ❌ **没有任何阴影原语**。material 里唯一的 "shadow" 是 switch 滑块用半透明圆盘近似 | 中 —— 需自建离屏模糊 |
-| **backdrop-filter / blur()** | ❌ 无 | 高 |
+| **CSS Grid 布局** | ✅ Taffy `grid` feature 已支持 | — |
+| **box-shadow** | ✅ 原生 `BoxShadow` | — |
+| **backdrop-filter / blur()** | ⚠️ 只有**窗口级** vibrancy（macOS `NSVisualEffectView`），无元素级 `backdrop-filter` | 高 |
 | **mix-blend-mode** | ❌ 无 | 高 —— 需离屏合成 |
-| **CSS filter** | ❌ 唯一的 "filter" 是图片缩放插值（linear/nearest） | 高 |
-| **CSS mask / 复杂 clip-path** | ⚠️ `clip.Path` 可近似，非等价 | 中 |
+| **CSS filter** | ❌ 无滤镜模型 | 高 |
+| **CSS mask / 复杂 clip-path** | ⚠️ 只有基础裁剪，无 CSS 遮罩模型 | 中 |
 | **::before / ::after** | ❌ 无伪元素 | 低 —— 用子元素替代 |
 | **自定义滚动条** | ❌ 无 `::-webkit-scrollbar` 等价物 | 低 —— 自绘 |
-| **transition / @keyframes** | ⚠️ 只有 `spring.rs` 弹簧动画，缓动曲线需重新实现 | 中 |
+| **transition / @keyframes** | ⚠️ 有动画系统，但非 CSS 缓动曲线模型 | 中 |
 | **像素级字体渲染** | ❌ | 不可解决 |
 
 ---
@@ -73,14 +80,16 @@
 
 | 规则 | 替代方案 |
 |---|---|
-| 禁用 CSS Grid | 全部用 Flex 布局 |
-| 禁用 box-shadow | 用预渲染的阴影位图，或用 1px 边框 + 背景色差模拟层次 |
-| 禁用毛玻璃 / 混合模式 | 用不透明度叠加的纯色 |
+| 禁用毛玻璃 / 混合模式 | 用不透明度叠加的纯色；窗口级 vibrancy 另算 |
+| 禁用 CSS 滤镜 | 用预渲染的位图或纯色替代 |
 | 渐变只用线性 | 径向渐变不用 |
-| 动画只用弹簧预设档位 | 不用 CSS 缓动曲线 |
+| 动画只用预设档位 | 不用 CSS 缓动曲线 |
 | 圆角只用固定档位 | 如 4 / 8 / 12 |
+| 阴影只用固定档位 | token 定义 offset / blur / spread 三参数 |
 
-这套规则做进 Figma 的组件库和 design token 后，**设计稿天然就落在 Gio 可映射的子集里**。此时还原度可以做到 **98–99%** —— 剩下的 1–2% 是字体光栅化的亚像素差异，人眼不可辨。
+> **CSS Grid 不在禁用清单内** —— Taffy 原生支持，这正是选 GPUI 而非 Gio 的关键原因之一。
+
+这套规则做进 Figma 的组件库和 design token 后，**设计稿天然就落在 GPUI 可映射的子集里**。此时还原度可以做到 **98–99%** —— 剩下的 1–2% 是字体光栅化的亚像素差异，人眼不可辨。
 
 ### 做法二：设计源用 token，不用 HTML
 
@@ -92,23 +101,18 @@ design/
 └── screenshots/         # 设计稿导出的 PNG，用作黄金图基准
 ```
 
-- `tokens.json` 是**唯一设计源**，前端原型与 Go 实现读同一份
+- `tokens.json` 是**唯一设计源**，前端原型与 Rust 实现读同一份
 - HTML 的作用是出稿和验证交互，不是最终实现
 - 翻译过程是机械映射，不靠人肉对像素
 
 ### 做法三：还原度用黄金图度量
 
-Gio 的 `unit` 包能把界面渲染成图片：
-
-```go
-golden := unit.New(frame)
-img := golden.Image()
-```
+gpui 有 `platform/visual_test.rs` 截图对比与 `toggle_headless` 无头模式。
 
 流程：
 
 1. 从设计稿导出 PNG（`design/screenshots/`）
-2. Gio 渲染同一界面 → PNG
+2. 实现截图 → PNG
 3. 两者做像素 diff（SSIM 或感知哈希）
 4. 设阈值（如 SSIM ≥ 0.98）进 CI
 
@@ -120,12 +124,11 @@ img := golden.Image()
 
 SelaDB 的界面主体是数据表格，而**数据表格的经典布局正是 CSS Grid**（表头固定 + 主体纵向滚动 + 横向滚动 + 列宽可调）。
 
-Gio 没有 Grid，只有 Flex。要实现这个布局只有两条路：
+**GPUI 的 Taffy 原生支持 Grid，设计稿可以照常用 CSS Grid 表达，不必降级成 Flex。** 这是选 GPUI 的直接收益 —— 换成 Gio 就只能要么禁用 Grid、要么自建布局器。
 
-1. **用 Flex 拼** —— 表头是横向 Flex，主体是纵向虚拟化 List，两者用 `layout.Stack` 叠加，表头和主体各自独立滚动并同步横向偏移。可行，但列宽对齐需要手动同步
-2. **自己实现 Grid 布局** —— 在 `internal/ui/` 里写一个 Grid 布局器（把子元素按行列放置）。工作量不小，但只有这一个布局器，之后所有 Grid 设计稿都能直接映射
+GPUI 官方 `examples/data_table.rs` 给出的实现路线是：表头与 `uniform_list` 平级（表头天然固定），列宽由 `FIELDS` 数组统一定义，可见范围通过 `uniform_list` 的 `range` 回调追踪。
 
-**建议：走 Flex 拼的路线，把 Grid 列入禁用清单。** 表格的列宽同步问题在实现时集中处理一次即可。
+需要自建的增量主要是：列宽拖拽调整（官方示例是固定列宽）、横向滚动与纵向滚动的偏移同步、单元格类型着色（NULL / BLOB / 时间格式）。
 
 ---
 
@@ -135,12 +138,12 @@ Gio 没有 Grid，只有 Flex。要实现这个布局只有两条路：
 
 | 成本 | 说明 |
 |---|---|
-| 阴影自建 | 若设计上不允许用边框模拟，需要写离屏模糊渲染 |
-| Grid 缺失 | 要么禁用，要么自建布局器 |
-| 人工翻译层 | CSS → Gio 的映射是人工的，没有自动化工具 |
+| 人工翻译层 | CSS → GPUI 的映射是人工的，没有自动化工具 |
 | 像素差异 | 字体光栅化永远不一致，黄金图阈值要留余量 |
-| 交互状态 | CSS 的 `:hover` / `:focus` / `:active` 要逐个映射成 Gio 的事件回调 |
+| 交互状态 | CSS 的 `:hover` / `:focus` / `:active` 要逐个映射成 gpui 的 `interactivity` 回调 |
 | 字体回退 | 需确认目标平台的系统中文字体覆盖情况与设计稿一致 |
+| 列宽拖拽 | 官方示例是固定列宽，拖拽调整需自建 |
+| 双轴滚动同步 | 表头与主体的横向偏移需手动同步 |
 
 ---
 

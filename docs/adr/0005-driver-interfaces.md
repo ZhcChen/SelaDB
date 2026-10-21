@@ -31,19 +31,17 @@ type Querier interface          { Query(ctx, sql string, args []any) (*ResultSet
 type Execer interface           { Exec(ctx, sql string, args []any) (ExecResult, error) }
 ```
 
-引擎包在 `init()` 中注册自己：
+引擎模块在初始化时注册自己：
 
-```go
-func init() {
-    driver.Register(&PostgresDriver{})
-}
+```rust
+// 每个引擎模块实现 Driver 后调用 driver::register
 ```
 
 使用方按能力探测：
 
-```go
-if lister, ok := conn.(driver.TableLister); ok {
-    tables, err := lister.Tables(ctx, schema)
+```rust
+if let Some(lister) = conn.as_table_lister() {
+    let tables = lister.tables(ctx, schema)?;
 }
 ```
 
@@ -57,5 +55,5 @@ if lister, ok := conn.(driver.TableLister); ok {
 ## 后果
 
 - 调用方要做类型断言，代码比胖接口啰嗦
-- 需要一份「引擎能力矩阵」的文档，供 UI 层决定显示什么。计划放在 `docs/engine-support.md`，随引擎支持情况维护
-- **不能**用反射或代码生成来消除类型断言的样板代码 —— 那样会把编译期检查换成运行时失败，得不偿失
+- 需要一份「引擎能力矩阵」的文档，供 UI 层决定显示什么。放在 `docs/engine-support.md`，随引擎支持情况维护
+- **不能**用宏或代码生成来消除能力探测的样板代码 —— 那样会把编译期检查换成运行时失败，得不偿失

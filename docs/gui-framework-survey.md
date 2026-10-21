@@ -200,30 +200,99 @@ div().flex().flex_col().gap_3().bg(rgb(0x505050)).size(px(500.))
 
 官方示例里直接有 `uniform_list`（虚拟化列表）、`grid_layout`、`tree`、`text`、`text_wrapper`、`shadow`、`svg`、`a11y`、`toggle_headless` —— 对数据库工具来说该有的骨架都有。
 
-#### 问题一：组件库是 GPL-3.0-or-later，且未发布
+#### 许可证：gpui 本体可独立使用，Zed 的应用层组件不可用
 
-| crate | license | 发布状态 |
+| crate | license | crates.io |
 |---|---|---|
-| `gpui` | **Apache-2.0** | ✅ 已发布（crates.io 0.2.2） |
-| `ui`（Zed 组件库） | **GPL-3.0-or-later** | ❌ 未发布 |
-| `component` | **GPL-3.0-or-later** | ❌ 未发布 |
+| `gpui` | **Apache-2.0** | ✅ 0.2.2 |
+| `gpui_collections` / `gpui_http_client` / `gpui-macros` / `gpui_util` / `gpui_util_macros` | Apache-2.0 | ✅ 均为 0.2.x |
+| `blade-graphics`（GPU 抽象层） | Apache-2.0 | ✅ 0.9.0 |
+| `ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu` / `search` | **GPL-3.0-or-later** | ❌ 未发布（Zed 工作区 `publish = false`） |
 
-Zed 工作区根 `Cargo.toml` 写着 `[workspace.package] publish = false`，而 `crates/ui`、`crates/component` 用 `publish.workspace = true` 继承 —— 结果是 **false**，crates.io 上查无此包（索引返回空）。
+**gpui 本体及其全部依赖都已发布，可完全独立使用**（依赖在发布时重命名以避免与 Zed 主程序冲突：`collections` → `gpui_collections`、`http_client` → `gpui_http_client`、`gpui_macros` → `gpui-macros`）。
 
-后果有两层：
+不能用的是 Zed 的应用层组件库 —— 那些是 GPL-3.0-or-later 且未发布。但对 SelaDB 来说这影响有限：Zed 的 `ui` 组件是按 Zed 的设计语言做的，数据库工具本来就要自己的组件；**更关键的是官方示例 `examples/data_table.rs` 就在 gpui crate 内（Apache-2.0 的一部分），是 473 行的完整数据表参考实现**。
 
-1. **许可证**：SelaDB 若依赖 Zed 的组件库（Button / Input / Table / Tree 等现成控件），GPL-3.0 的传染性会要求 SelaDB 整体以 GPL-3.0 分发。对一个数据库管理软件，这通常不可接受。
-2. **只能用 git path 依赖**：`git = "https://github.com/zed-industries/zed"` + `path = "crates/ui"`，等于把整个 Zed 仓库拖进构建。
+#### 版本稳定性：比 Gio 更好，而非更差
 
-**只能用 `gpui` 本体（Apache-2.0）的话，组件全部自建** —— 处境和 Gio 相同，但可选的现成件更少（Gio 至少有 `widget/material` 的成套基础控件）。
-
-#### 问题二：GPUI 与 Zed 绑定
-
-gpui.rs 官网原文：
+gpui.rs 官网说：
 
 > For the near future, GPUI is tied to Zed, so contributions will need to be made there and kept in sync with it.
 
-即：GPUI 的版本节奏由 Zed 决定，而 Zed 是每天几十个 commit 的高速迭代项目。这比 Gio 的「0.x 不回移 bugfix」更不稳定 —— Gio 至少是一个聚焦的小项目，GPUI 是大项目的一个子模块。
+这句话约束的是**「你不能给 gpui 单独打补丁」**（贡献要提到 Zed 仓库），**不是「你不能锁版本」**。
+
+实测 crates.io 发布记录：
+
+| 版本 | 发布时间 |
+|---|---|
+| 0.2.0 | 2025-10-09 |
+| 0.2.1 | 2025-10-14 |
+| 0.2.2 | 2025-10-22 |
+
+**三个版本全部集中在 2025 年 10 月，之后整整一年没有新版本。** 这与 Gio 截然相反 —— Gio 官方明说 0.x 阶段每次 minor 升级都是破坏性变更、tags 不回移 bugfix、必须跟 `main`。
+
+**结论：gpui 一年一版、可以正常锁版本，API 稳定性实际优于 Gio。** 这条把此前「GPUI 版本比 Gio 更不稳定」的判断推翻了。
+
+#### 中文 IME：完整逐平台协议实现
+
+gpui 的 IME 不是权宜之计，是按平台协议实现的：
+
+| 平台 | 实现 |
+|---|---|
+| macOS | Cocoa `NSTextInput` 协议 —— `set_marked_text` / `insert_text` / `has_marked_text` / `marked_text_range` / `valid_attributes_for_marked_text` 全部实现（`src/platform/mac/window.rs`） |
+| Linux Wayland | `input_handler.marked_text_range()` 集成（`src/platform/linux/wayland/window.rs`） |
+| Linux X11 | 同上（`src/platform/linux/x11/window.rs`） |
+
+Zed 是编辑器，中文输入是刚需，这条路径是生产验证过的。完整度与 Gio 的 `app/ime.go` 相当。
+
+#### 官方数据表参考实现
+
+`examples/data_table.rs`（473 行，Apache-2.0）已经实现了数据库表格需要的全套：
+
+- 固定表头（表头与 `uniform_list` 平级，天然固定）
+- `uniform_list` 虚拟化（`cx.processor(move |this, range: Range<usize>, _, _| ...)`，只渲染可见区间）
+- 固定列宽（`FIELDS.map(|(key, width)| ... .w(px(width)))`）
+- 文本截断（`.truncate().whitespace_nowrap()`）
+- 自定义滚动条（`render_scrollbar`）
+- 可见范围追踪（`self.visible_range = range.clone()`）
+- 单元格类型着色（`change_color` 返回 `gpui::Hsla`）
+
+**这是所有候选方案里唯一由框架作者提供的、Apache-2.0 的完整数据表实现。**
+
+#### 实测验证：gpui 独立可用
+
+我实际拉了 crates.io 上发布的 `gpui 0.2.2`，把官方的 `examples/data_table.rs` 拷进一个空项目，验证「第三方能否脱离 Zed 仓库独立使用」：
+
+```toml
+[dependencies]
+gpui = "0.2"
+rand = "0.9"
+```
+
+| 验证项 | 结果 |
+|---|---|
+| 独立构建 | ✅ 成功 |
+| 产物大小 | **5.6M**（比 eframe 的 13M 还小） |
+| 链接的图形后端 | `Metal.framework` + `QuartzCore.framework` → **真正的 macOS 原生 GPU 渲染** |
+| 冷编译（含 Metal shader 编译） | ~76s |
+| 真增量（改一行） | **0.99s** |
+| 依赖来源 | 全部来自 crates.io，**不需要 git/path 依赖 Zed 仓库** |
+
+唯一需要处理的坑：`examples/data_table.rs` 用了 `rand 0.9` 的 API（`rand::rng()` / `rng.random_range()`），照抄时注意版本。
+
+#### 构建环境要求：macOS 需要 Metal Toolchain
+
+gpui 的 build.rs 会**在编译期调用 Apple 的 `metal` 着色器编译器**。现代 Xcode 默认不带 Metal Toolchain 组件，实测：
+
+```
+cargo::error=metal shader compilation failed:
+error: cannot execute tool 'metal' due to missing Metal Toolchain;
+use: xcodebuild -downloadComponent MetalToolchain
+```
+
+`xcodebuild -showComponent MetalToolchain` → `Status: uninstalled`。
+
+需要执行一次 `xcodebuild -downloadComponent MetalToolchain`（多 GB 下载）。这是 gpui 在 macOS 上独有的前置条件 —— **CI 的 macOS runner 也必须预装这个组件**，否则构建直接失败。这是选型时容易被忽略的运维成本。
 
 #### 还原度评估：GPUI 确实是四者里最接近 Web 的
 
@@ -301,14 +370,24 @@ gpui.rs 官网原文：
 
 **Gio 仍然是「全 Go + 原生 GPU + 靠谱中文输入」三项同时满足的唯一方案。**
 
-### 5.1.1 GPUI 的位置：不是 Go 方案，但值得单列
+### 5.1.1 GPUI：经过实测后，是原生方案里的最优解
 
-GPUI 的还原度是所有候选里最高的（Taffy 同源布局算法 + Tailwind 风格 API + 视觉测试），但两个问题对 SelaDB 是**否决级**的：
+此前对 GPUI 的两条否定理由经核实后都不成立：
 
-1. **组件库 GPL-3.0-or-later 且未发布** —— 用了就把 SelaDB 拖进 GPL 分发；不用就只剩 `gpui` 本体，组件全自建
-2. **与 Zed 绑定** —— 版本跟着每天几十个 commit 的 Zed 走，比 Gio 更不稳定
+| 此前判断 | 核实结果 |
+|---|---|
+| 「组件库 GPL-3.0 且未发布 → 不可用」 | **gpui 本体 Apache-2.0，全部依赖已发布，可完全独立使用**（已实测构建成功）。GPL-3.0 只影响 Zed 的应用层组件库，而那些组件本就是按 Zed 设计语言做的，数据库工具也要自己的；官方 `data_table.rs` 参考实现就在 Apache-2.0 的 crate 内 |
+| 「与 Zed 绑定 → 版本比 Gio 更不稳定」 | **反了**。gpui 0.2.0/0.2.1/0.2.2 全发布于 2025-10，之后一年无新版本 —— 一年一版、可以正常锁版本。Gio 才是「0.x 每次 minor 破坏 + 不回移 bugfix + 必须跟 main」 |
 
-如果 SelaDB 确定开源并接受 GPL-3.0，GPUI 值得重新评估；如果要闭源或用宽松许可证，直接排除。
+修正后 GPUI 的优势是全部候选里最完整的：
+
+- **Taffy = 浏览器同源的 Flexbox + Grid + Block + Float 全套** → 唯一能直接映射 CSS Grid 的方案
+- **官方 473 行数据表参考实现**（Apache-2.0）→ 固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条
+- **完整逐平台 IME**（Cocoa `NSTextInput` / Wayland / X11）→ Zed 生产验证
+- **实测独立可用**，产物 5.6M，真增量 0.99s
+- 公司维护、版本稳定、无头模式 + 截图对比测试
+
+代价（仍然成立）：macOS 构建需装 Metal Toolchain 组件（838MB，CI 也要预装）、交叉编译 Windows 需 mingw-w64、**独立生态规模小**（gpui 38 万下载 vs egui 2722 万 —— 因为 Zed 内部走 path 依赖，第三方参考资料少）。
 
 ### 5.2 回答「不行就用 Rust」
 
@@ -319,6 +398,26 @@ GPUI 的还原度是所有候选里最高的（Taffy 同源布局算法 + Tailwi
 - ⚠️ **Tauri** —— IME 完美、组件生态最好，但那是 WebView 路线，与「原生 GPU 渲染」的需求冲突；且 Tauri v3 还在 alpha
 
 ### 5.3 我的建议
+
+**经源码核实与实测，最终结论：Rust + GPUI。**
+
+理由汇总（全部有实测或源码依据）：
+
+| 维度 | Go + Gio | Rust + GPUI | 胜出 |
+|---|---|---|---|
+| CSS Grid 布局 | ❌ 无 | ✅ Taffy 浏览器同源 | **Rust** |
+| 现成数据表实现 | ❌ 自建 800–1500 行 | ✅ 官方 473 行参考实现 | **Rust** |
+| 中文 IME | ✅ 协议级完整 | ✅ 完整逐平台 | 平 |
+| 阴影 / 渐变 | ❌ 无阴影原语 | ✅ `BoxShadow` + `linear_gradient()` | **Rust** |
+| 版本可锁性 | ❌ 必须跟 main | ✅ 一年一版，可锁 | **Rust** |
+| 维护主体 | 个人 | 公司 | **Rust** |
+| 增量编译 | 0.83s | 0.99s | 平 |
+| 冷编译 | **9.3s** | 76s | **Go** |
+| 交叉编译 Windows | **零工具链** | 需 mingw-w64 / VS Build Tools | **Go** |
+| macOS 构建前置 | 无 | 需 Metal Toolchain 组件 | **Go** |
+| 产物体积 | 8.9M | **5.6M** | **Rust** |
+
+**唯一的 Go 优势是构建摩擦，而它体现在冷编译和交叉编译上。** 日常增量两者持平。
 
 **第一步先定「还原度」是不是硬需求。** 这是所有分支的根：
 

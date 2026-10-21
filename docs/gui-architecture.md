@@ -1,11 +1,9 @@
-# GUI 方案：Gio（原生 GPU 渲染）
+# GUI 方案：GPUI
 
-> 状态：初版（2026-10-21）
-> 关联：ADR-0004（界面栈选型）、ADR-0002（保持 CGO_ENABLED=0）
+> 状态：2026-10-21 定稿
+> 关联：ADR-0004（界面栈选型）、ADR-0002（CGO 边界）、[`gui-framework-survey.md`](gui-framework-survey.md)（全景对比）、[`compile-benchmarks.md`](compile-benchmarks.md)（实测数据）
 >
-> **本文档取代了初版基于 Wails 的方案。** 需求确认为「Go + 原生平台 GPU 渲染」，因此系统 WebView 路线出局，候选收敛到 Gio / Fyne / giu。
->
-> Go 与 Rust 两个生态的完整方案对比见 [`gui-framework-survey.md`](gui-framework-survey.md)。设计稿到原生实现的还原度边界与达成条件见 [`ui-fidelity.md`](ui-fidelity.md)。
+> **决策沿革**：初版 Wails v2 + Web 前端 → 因需求改为「原生 GPU 渲染」转向 Gio → 经源码核实与实测转向 **GPUI**。详见 ADR-0004 的决策沿革。
 
 本文聚焦 GUI 客户端。核心库、CLI、MCP Server 的选型见 [`architecture.md`](architecture.md)。
 
@@ -13,351 +11,297 @@
 
 ## 1. 结论
 
-**GUI 用 `gioui.org`（Gio），immediate mode + 平台原生 GPU 后端。**
+**GUI 用 `gpui`（Zed 的框架）v0.2.2，Apache-2.0，可脱离 Zed 仓库独立使用。**
 
-| 平台 | 渲染后端 | 实现位置 |
-|---|---|---|
-| macOS / iOS | **Metal** | `app/metal_darwin.go`、`app/metal_macos.go`、`app/metal_ios.go` |
-| Windows | **Direct3D 11** | `app/d3d11_windows.go`（另有 EGL 路径 `app/egl_windows.go`） |
-| Linux | **Vulkan** | `app/vulkan_x11.go`、`app/vulkan_wayland.go`、`app/vulkan_android.go`（另有 EGL 路径） |
-| macOS 备用 | OpenGL | `app/gl_macos.go` |
+| 平台 | 渲染后端 |
+|---|---|
+| macOS | **Metal**（`Metal.framework` + `QuartzCore.framework`，已实测链接确认） |
+| Linux | Vulkan（经 `blade-graphics`） |
+| Windows | Direct3D 12 / Vulkan（经 `blade-graphics`） |
 
-Gio 的 `go.mod` 依赖全部是纯 Go：`golang.org/x/exp/shiny`（窗口）、`gioui.org/shader`（着色器）、`github.com/go-text/typesetting`（文本排版）、`eliasnaur.com/font`（字体）。
+依赖 `blade-graphics` 0.9.0（Zed 的 GPU 抽象层，Apache-2.0，crates.io 已发布），一套代码覆盖三平台。
 
 ---
 
-## 2. 候选对比
+## 2. 为什么是 GPUI
 
-### 2.1 总览
+### 2.1 布局层与浏览器同源
 
-| 维度 | **Gio** | Fyne | giu |
-|---|---|---|---|
-| 版本 | v0.10.3（2026-09-28） | v2.8.2（2026-10-07） | v0.15.0（2026-06-02） |
-| 架构 | immediate mode | retained mode | immediate mode（Dear ImGui 绑定） |
-| macOS GPU | **Metal** | OpenGL | OpenGL |
-| Windows GPU | **D3D11** | OpenGL | OpenGL |
-| Linux GPU | **Vulkan** | OpenGL | OpenGL |
-| cgo | darwin + wayland 需要 | **全平台需要**（glfw） | 全平台需要 |
-| 数据表格 | **需自建** | **现成且已虚拟化** | 需自建 |
-| 树形导航 | 需自建 | **现成** | 需自建 |
-| 桌面 IME | **协议级完整实现** | 有，长尾问题多 | 依赖 ImGui |
-| 无头 UI 测试 | **`unit` 包支持黄金图** | 有 test driver | 无 |
-| 依赖管理 | **不能锁版本**（见 2.4） | 稳定语义化版本 | 稳定 |
-| 视觉 | 完全自绘 | 现成 Material 主题 | ImGui 风格 |
+GPUI 用 **Taffy 0.13**，features 开启 `flexbox` / `grid` / `block_layout` / `float_layout` / `content_size` —— 这是浏览器的 CSS 布局算法集，**不是仿写，是同一套实现**。
 
-### 2.2 为什么选 Gio 而不是 Fyne
+这意味着设计稿的布局可以近乎直接映射：
 
-**理由一：Metal / D3D11 / Vulkan 才是真正的「原生平台 GPU 渲染」。**
-
-Fyne 的渲染后端只有 `internal/painter/gl`（OpenGL）与 `internal/painter/software`（软件光栅回退），没有 Metal、没有 Vulkan、没有 D3D。而 **Apple 已全面弃用 OpenGL** —— 它在 Apple 平台上仍可用，但不再是被推荐的 API，风险随时间上升。在 macOS 上用 OpenGL 做新项目，等于给自己埋一颗定时炸弹：Gio 的 Metal 路径没有这个问题。
-
-**理由二：中文输入法质量差距明显。**
-
-Gio 的 `app/ime.go` 是完整的文本输入协议实现：preedit（候选串）、commit（提交）、surrounding text（上下文同步）、UTF-16 ↔ rune 索引互转。这套东西是按 X11 / Wayland / Win32 / Cocoa 的输入协议逐个平台实现的，中文输入法是它的强项。
-
-Fyne 的 IME 则是长期问题重灾区，截至 v2.8.2 仍有三个 open issue 直接命中：
-
-- [#618](https://github.com/fyne-io/fyne/issues/618) The input method is located outside the app（输入法候选窗跑到应用外）
-- [#2777](https://github.com/fyne-io/fyne/issues/2777) Chinese input method string truncated when typing into `widget.NewEntryWithData`（中文输入被截断）
-- [#2418](https://github.com/fyne-io/fyne/issues/2418) Android app does not show Chinese (default) keyboard
-
-历史上还有「候选窗跑到左上角」（#6606、#4546、#3884）、「用中文输入法崩溃」（#3213）、「无法输入中文」（#4544）等多个 issue。这些虽然多数已关闭，但说明这条路径长期不稳。对一个 SQL 编辑器要输入中文注释、表名、查询条件的工具，这是不可接受的风险。
-
-**理由三：cgo 依赖面更小。**
-
-Fyne 因为 `github.com/go-gl/glfw/v3.4/glfw`，**三平台全部需要 cgo**。Gio 只有 darwin（`app/os_darwin.m` 引入 `_cgo_export.h`）和 Linux Wayland（`app/os_wayland.c`）需要。这意味着：
-
-- Windows 与 macOS 的 GUI 产物可以在对应系统上直接构建，不依赖完整交叉编译工具链
-- Linux 的 X11 路径可以走纯 Go
-
-**理由四：无头黄金图测试。**
-
-Gio 的 `unit` 包能把界面渲染成图片，与基准图做像素对比。这让 UI 回归测试可以在 CI 里跑，不需要真实窗口 —— 与「开发测试不抢占本机前台」的实践要求天然契合。
-
-**理由五：immediate mode 代码量小。**
-
-Fyne 是 retained mode，每个组件要写 CanvasObject、Renderer、对象池、刷新触发，代码量大几倍。Gio 每次调用重建 UI 树，组件就是一个函数。
-
-### 2.3 代价：表格和树要自己写
-
-Gio 的 `widget` 包里有 button、editor（多行）、list、label、text、icon、image、dnd、selectable、border、decorations、material 主题，但**没有 Table，也没有 Tree**。
-
-好消息是底座是现成的：`layout.List` 是真虚拟化，源码注释写明 ——
-
-> Layout can handle very large lists because it only calls w to fill its viewport and the distance scrolled, if any.
-
-即只对可见区间调用渲染回调。Fyne 的 Table 用的也是同一套思路（`visibleRowHeights` / `visibleColumnWidths` + 单元格池化 + 增量刷新）。所以两边的表格性能上限是同一量级，差别只在谁来写。
-
-**这张表要做多少工作**（按数据库场景的真实需求）：
-
-| 能力 | 说明 |
+| CSS | GPUI |
 |---|---|
-| 虚拟化渲染 | 用 `layout.List` 承接，行高按内容类型分档 |
-| 横向滚动 + 纵向同步 | 两轴联动，列头固定 |
-| 列头 | 表名 + 类型标识 + 排序指示器 |
-| 列宽调整 | 拖拽改变宽度，需缓存每列宽度 |
-| 单元格渲染 | 按类型着色、NULL 样式、字节流截断、时间格式 |
-| 选中 / 高亮 / 键盘导航 | 方向键移动、Shift 多选、Ctrl 复制 |
-| 排序 | 交回 service 层执行（`ORDER BY`），不在客户端排 |
+| `display: flex` + `flex-direction` / `gap` / `justify-content` / `align-items` | `div().flex().flex_col().gap_3().justify_center().items_center()` |
+| `display: grid` + `grid-template-columns` | Taffy 的 grid 支持，**唯一能直接映射 CSS Grid 的候选** |
+| `position: absolute` | `layout.Stack` |
+| `padding` / `margin` / `border` / `box-sizing` | 完整支持 |
+| `float` / `block` 流式布局 | Taffy 支持 |
 
-预计 800–1500 行 Gio 代码。这部分工作量对两个方案是一样的 —— 即使用 Fyne，通用 Table 也不提供类型着色、NULL 样式、字节截断，最终照样要重写渲染层。
+API 形态接近 Tailwind 的 utility class，设计稿的规整布局能一对一手写。
 
-树形导航（连接 → 库 → schema → 表 → 列）逻辑更简单，约 300–500 行。
+### 2.2 官方提供的数据表参考实现
 
-### 2.4 Gio 的真实风险：依赖不能锁版本
+`gpui` crate 内自带 `examples/data_table.rs`（**473 行，Apache-2.0**），已经实现数据库表格需要的全套：
 
-Gio 的 README 明确写着：
+| 能力 | 实现 |
+|---|---|
+| 固定表头 | 表头与 `uniform_list` 平级，天然固定 |
+| 虚拟化 | `uniform_list` + `cx.processor(move \|this, range: Range<usize>, _, _| ...)`，只渲染可见区间 |
+| 列宽 | `FIELDS.map(\|(key, width)\| ... .w(px(width)))` |
+| 文本截断 | `.truncate().whitespace_nowrap()` |
+| 自定义滚动条 | `render_scrollbar` |
+| 可见范围追踪 | `self.visible_range = range.clone()`，可用于分页与虚拟滚动联动 |
+| 单元格类型着色 | `change_color` 返回 `gpui::Hsla` |
 
-> Pre-1.0 tags are provided for reference only, and do not designate releases with ongoing support. Bugfixes will not be backported to older tags.
-> Tags follow semantic versioning. In particular, as the major version is zero: breaking API or behavior changes will increment the minor version component.
+**这是所有候选里唯一由框架作者提供、且许可可商用的完整数据表实现。**
 
-即：
+### 2.3 中文 IME 是完整协议实现
 
-1. **不能锁版本号**。锁了 v0.10.3 就拿不到后续 bugfix，因为不承诺回移
-2. **必须跟 `main` 分支**。0.x 阶段每次 minor 升级都是破坏性 API 变更
-3. 官方 CI 在 builds.sr.ht 上跑，提交频率不低，破坏性变更会持续出现
-
-**风险隔离方案（必做）**：把所有 Gio 代码关在 `internal/ui/` 这一个包里，外部只暴露与引擎无关的领域类型和回调签名。这样 Gio 的 API 变动只影响一个包，修复面可控。禁止在 `internal/ui/` 之外 import `gioui.org`。
-
-配套要求：
-
-- 锁 `go.mod` 中的 Gio 版本，但**允许 CI 每周试一次升级**，而不是被动等破坏
-- 在 `internal/ui/` 里维护一层薄适配器，把 Gio 的 `layout.Context` / `op.Ops` 等类型隔离在包内
-- 记录「Gio 升级」为一条常规维护任务，升级时只需修 `internal/ui/`
-
-### 2.5 giu 为什么出局
-
-giu 是 Dear ImGui 的 Go 绑定：cgo + 捆绑 ImGui C++ 库。外观是 ImGui 风格（对终端用户是加分，对「现代桌面应用」是减分），数据表格组件同样要自写。相比 Gio 没有优势，相比 Fyne 的组件更弱。多一个候选不改变结论。
-
-### 2.6 代码级评估（读源码后的发现）
-
-以下结论来自直接阅读 Gio v0.10.3、go-text/typesetting 与 gio-x 的源码，不是文档摘抄。
-
-#### 代码质量：高于预期
-
-核心里已经处理了成熟框架才会关心的细节：
-
-| 能力 | 实现位置 | 说明 |
+| 平台 | 实现位置 | 内容 |
 |---|---|---|
-| GPU 设备丢失恢复 | `app/window.go` → `gpu.ErrDeviceLost` | 驱动重置、显卡切换、驱动更新后重建上下文并重试，不是直接退出 |
-| 无障碍语义树 | `app.SemanticRoot` / `LookupSemantic` / `AppendSemanticDiffs` | 屏幕阅读器可读，很多 Go GUI 库完全没有 |
-| 焦点管理 | `moveFocus` / `RevealFocus` / `ScrollFocus` | 方向键移动焦点、滚动到可见区域 |
-| IME 状态机 | `app/callbacks` → `SetComposingRegion` / `EditorInsert` / `EditorReplace` / `SetEditorSelection` / `SetEditorSnippet` | 完整的文本输入协议 |
-| 文本整形 | `text` → go-text/typesetting | HarfBuzz 整形 + CSS 换行规则 + bidi + 字形覆盖率 |
+| macOS | `src/platform/mac/window.rs` | Cocoa `NSTextInput` 协议：`set_marked_text` / `insert_text` / `has_marked_text` / `marked_text_range` / `valid_attributes_for_marked_text` |
+| Linux Wayland | `src/platform/linux/wayland/window.rs` | `input_handler.marked_text_range()` 集成 |
+| Linux X11 | `src/platform/linux/x11/window.rs` | 同上 |
 
-注释密度高、文档规范，没有「看起来像 Go 但其实是 C 翻译」的痕迹。
+Zed 是编辑器，中文输入是刚需，这条路径是生产验证过的。
 
-#### 维护状态：健康
+### 2.4 版本稳定，可正常锁版本
 
-最近提交 2026-10-14（距今 7 天），仓库 `pushed_at` 2026-10-15。贡献者除主维护者 Elias Naur 外还有 Chris Waldon、qiannian、Martin Lange、Tobias Gesellchen、astaroth、aarzilli 等。
+gpui 的 crates.io 发布记录：
 
-commit message 质量很高，例如 #714（Windows D3D11 设备丢失）明确写出根因 —— "DXGI usually reports a removed or reset device from Present, after a driver reset (TDR), driver update, or GPU switch" —— 并给出复现路径。这类修复是真实生产环境打磨出来的。
-
-#### 中文可用性：比预期好得多
-
-`text` 包**默认加载系统字体**（`text.NoSystemFonts()` 才是用来关闭它的），底层是 go-text/typesetting 的 `fontscan`：
-
-- **纯 Go 跨平台字体发现**。`fontscan/readme.md` 写明字体目录来自 `DefaultFontDirectories()`，目录列表抄自 fontconfig 与 go-findfont。Linux 上不需要 fontconfig 这个 C 库，Windows 上不需要 DirectWrite 绑定
-- **字形覆盖率查询**（`fontscan/rune_coverage.go`）—— 主字体缺字时能正确回退到含该字形的字体
-- **CSS 风格的样式匹配** + fontconfig 风格的家族替换规则（`substitutions_table.go`）
-
-因此 macOS 会取到苹方、Windows 取到微软雅黑、Linux 取到 Noto Sans CJK，**不需要打包中文字体**。这是相对 Fyne 的一个实打实的优势。
-
-代价：首次启动要做一次字体索引扫描，约 0.2–0.5 秒，之后走磁盘缓存快速加载。对「轻快」定位是一次性的首启延迟，需要在首次启动体验上做处理（比如先显示窗口再加载）。
-
-#### 明确的短板
-
-| 短板 | 事实 |
+| 版本 | 发布时间 |
 |---|---|
-| **无 Table / Tree** | `widget` 包 31 个文件里没有表格和树 |
-| **material 组件偏少** | 只有 16 个文件：button、checkable、checkbox、decorations、editor、label、list、loader、progressbar、progresscircle、radiobutton、slider、switch、theme。没有 tree / table / tabs / menu / dialog / dropdown |
-| **Issue tracker 不在 GitHub** | 仓库 `has_issues: false`，问题走 todo.sr.ht 邮件列表。团队协作与社区反馈可见度都差，搜 GitHub Issues 也搜不到 |
-| **示例仓库 8 个月未更新** | `gioui/gio-example` 最后 push 2026-02-18，学习资料可能滞后于 API 变化 |
-| **生态薄** | gio-x（扩展）66 stars，gio-cmd 19 stars。第三方组件基本没有 |
-| **依赖不能锁版本** | 见 2.4 |
+| 0.2.0 | 2025-10-09 |
+| 0.2.1 | 2025-10-14 |
+| 0.2.2 | 2025-10-22 |
 
-另外需要知道的一点：**Gio 和 Fyne 是同一个作者**（Elias Naur）。选 Gio 不是换了个维护者，而是同一个人的两条技术路线。两边目前都在活跃维护，但如果他转向某一边，另一边的活跃度会受影响 —— 这是单点维护者的固有风险，两个方案都躲不掉。
+三个版本集中在 2025-10，之后一年无新版本。**一年一版 = 可以正常锁版本、可以计划升级**。
 
-#### 判断
+对比 Gio：官方明说 0.x 阶段每次 minor 升级都是破坏性变更、tags 不回移 bugfix、必须跟 `main` 分支 —— 那是完全相反的处境。
 
-**值得用，但价值不在「省事」，在「能力上限」。**
+gpui.rs 官网说「GPUI is tied to Zed」约束的是**你不能给 gpui 单独打补丁**（贡献要提到 Zed 仓库），不是「你不能锁版本」。
 
-- 若目标是「快速做一个能用的桌面 GUI」→ Fyne 更省事，Table 与 Tree 现成
-- 若目标是「在 macOS 上做一个不落后于原生应用的东西」→ 只有 Gio 能做到，因为 Apple 弃用了 OpenGL
-- 若目标是「中文输入可靠」→ Gio 明显更好，且不需要打包中文字体
+### 2.5 独立使用已实测通过
 
-对 SelaDB 而言，需要自建的三个组件（表格、树、编辑器高亮）恰好是产品的核心竞争力所在。Fyne 的通用 Table 最终也要重写渲染层才能做类型着色、NULL 样式、BLOB 截断、DDL 预览这些数据库特有表达。
+我把 crates.io 上发布的 `gpui 0.2.2` 拉进一个空项目，只依赖 crates.io（无任何 git/path 依赖）：
 
-也就是说：**自建成本在两个方案里是相近的**，Gio 多给你 Metal、靠谱的 IME 和无头测试能力，Fyne 少给你这些、但多给你约 300–500 行的表格骨架代码。
+```toml
+[dependencies]
+gpui = "0.2"
+rand = "0.9"
+```
+
+| 验证项 | 结果 |
+|---|---|
+| 独立构建 | ✅ 成功 |
+| 产物大小 | **5.6M** |
+| 链接的图形后端 | `Metal.framework` + `QuartzCore.framework` |
+| 冷编译 | ~76s |
+| 真增量（改一行） | **0.99s** |
+
+gpui 的依赖在发布时重命名以避开与 Zed 主程序的冲突：`collections` → `gpui_collections`、`http_client` → `gpui_http_client`、`gpui_macros` → `gpui-macros`、`gpui_util` → `gpui_util`、`gpui_util_macros` → `gpui_util_macros`，全部在 crates.io 上。
 
 ---
 
-## 3. 架构约束的变化
+## 3. 许可证边界
 
-### 3.1 CGO 边界需要重新划线
-
-ADR-0002 原本要求全链路 `CGO_ENABLED=0`。选 Gio 后这条约束的**范围**要调整：
-
-| 产物 | CGO | 说明 |
+| crate | license | 可用性 |
 |---|---|---|
-| 核心库 | 0 | 不变 |
-| CLI | 0 | 不变 |
-| MCP Server | 0 | 不变 |
-| GUI（macOS） | **需要** | `app/os_darwin.m` 引入 `_cgo_export.h` |
-| GUI（Windows） | 0 | 纯 Go（D3D11 / EGL 路径无 C 代码） |
-| GUI（Linux X11） | 0 | 纯 Go |
-| GUI（Linux Wayland） | **需要** | `app/os_wayland.c` |
+| `gpui` | **Apache-2.0** | ✅ crates.io 0.2.2 |
+| `gpui_collections` / `gpui_http_client` / `gpui-macros` / `gpui_util` / `gpui_util_macros` | Apache-2.0 | ✅ 均为 0.2.x |
+| `blade-graphics` / `blade-macros` / `blade-util` | Apache-2.0 | ✅ |
+| `ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu` / `search` | **GPL-3.0-or-later** | ❌ 未发布（Zed 工作区 `publish = false`） |
 
-原 ADR-0002 的核心判断（「核心库/CLI/MCP 只用纯 Go 依赖，避免为 SQL 驱动引入 C 工具链」）**依然成立且更重要** —— 它保护的是三平台交叉编译的顺畅度，与 GUI 框架的选择无关。
+**规则：只依赖 Apache-2.0 的部分，不引入 Zed 的应用层 crate。**
 
-**唯一变化**：GUI 轨道不再是「Linux 才有例外」，而是「macOS 和 Linux Wayland 有例外」。这是范围澄清，不是判断推翻。
+这意味着组件要自建，但影响有限：
 
-### 3.2 目录结构调整
+- Zed 的 `ui` 组件是按 Zed 的设计语言做的，数据库工具本来就要自己的组件
+- 核心的通用控件在 `gpui` crate 内有基础设施（`interactivity`、`focus`、`tab_stop`、`clip`/`paint` 原语）
+- 数据表有官方 473 行参考实现可改
 
-Gio 的 immediate mode 要求「状态在外部、渲染无状态」，这与 Fyne 的 retained mode 目录结构不同：
+---
+
+## 4. 构建环境
+
+### 4.1 macOS 必须安装 Metal Toolchain
+
+gpui 的 build.rs 在编译期调用 Apple 的 `metal` 着色器编译器。现代 Xcode 默认不带该组件：
+
+```
+cargo::error=metal shader compilation failed:
+error: cannot execute tool 'metal' due to missing Metal Toolchain;
+use: xcodebuild -downloadComponent MetalToolchain
+```
+
+`xcodebuild -showComponent MetalToolchain` → `Status: uninstalled`。
+
+**一次性安装**：
+
+```bash
+xcodebuild -downloadComponent MetalToolchain   # 838.9 MB，本机实测 43 秒
+```
+
+**CI 的 macOS runner 也必须预装这个组件**，否则构建直接失败。这是选型时最容易漏掉的运维成本。
+
+### 4.2 交叉编译 Windows 需 mingw-w64
+
+Rust 交叉编译到 Windows 需要额外的链接器工具链：
+
+| target | 需要 | 本机实测 |
+|---|---|---|
+| `x86_64-pc-windows-msvc` | Windows 上的 Visual Studio Build Tools（提供 `link.exe`） | ❌ 失败 |
+| `x86_64-pc-windows-gnu` | mingw-w64（`brew install mingw-w64`） | ❌ 失败（未装） |
+
+Go 则是 `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build` 一条命令，零额外工具链 —— 这是 Go 相对 Rust 的实质优势。
+
+### 4.3 建议的构建矩阵
+
+| 目标 | 构建位置 | 额外依赖 |
+|---|---|---|
+| macOS arm64 / amd64 | macOS runner | **Metal Toolchain 组件** |
+| Windows amd64 / arm64 | Windows runner | 无（MSVC 工具链自带） |
+| Linux amd64 / arm64 | Linux 容器 | `libx11`、`libxkbcommon`、Vulkan 驱动 |
+
+**GUI 不做跨平台交叉编译**（图形栈交叉编译代价极高），各平台原生构建。
+
+---
+
+## 5. 目录结构
+
+GPUI 是混合模式（hybrid immediate & retained），状态在外部、渲染无状态：
 
 ```
 SelaDB/
-├── cmd/
-│   ├── seladb/              # CLI 入口
-│   ├── seladb-gui/          # GUI 入口（cmd/seladb-gui/main.go 只做启动）
-│   └── seladb-mcp/          # MCP Server 入口
-├── internal/
-│   ├── core/                # 领域模型：连接、库、schema、表、列、结果集
-│   ├── driver/              # 引擎抽象 + 注册表
-│   ├── query/               # 查询执行、结果集
-│   ├── session/             # 连接会话、凭据
-│   ├── service/             # 业务逻辑唯一落点
-│   ├── config/              # 配置加载
-│   ├── tui/                 # Bubble Tea 交互界面（CLI）
-│   └── ui/                  # ★ Gio 界面层，全部 Gio 代码关在这里
-│       ├── app.go           # 窗口与事件循环
-│       ├── theme.go         # 配色、字号、间距
-│       ├── table.go         # 虚拟化数据表格（自建）
-│       ├── tree.go          # 树形导航（自建）
-│       ├── editor.go        # SQL 编辑器（基于 widget.Editor + 高亮）
-│       └── ...
-└── pkg/
-    └── seladb/              # 对外稳定 API
+├── Cargo.toml
+├── crates/
+│   ├── seladb/                # 工作区入口（库）
+│   ├── seladb-cli/           # CLI 二进制：clap
+│   ├── seladb-mcp/           # MCP Server：rmcp
+│   └── seladb-gui/           # GUI 二进制：gpui
+├── src/  (或各 crate 内)
+│   ├── core/                 # 领域模型：连接、库、schema、表、列、结果集
+│   ├── driver/               # 引擎抽象 + 注册表
+│   │   ├── postgres/  mysql/  sqlite/  mssql/  clickhouse/  redis/  mongo/  oracle/
+│   ├── query/                # 查询执行、结果集
+│   ├── session/              # 连接会话、凭据
+│   ├── service/              # 业务逻辑唯一落点
+│   └── config/               # 配置加载
+├── design/
+│   ├── tokens.json           # 唯一设计源：颜色/间距/字号/圆角/阴影/动效
+│   └── screenshots/          # 设计稿导出 PNG（黄金图基准）
+└── docs/
 ```
 
-**硬约束：`internal/ui/` 之外不得 import `gioui.org`。** 这是 Gio 版本风险隔离的技术前提。
+### 5.1 分层规则
 
-### 3.3 状态管理
-
-Gio 是 immediate mode，状态（当前连接、当前选中表、滚动位置、筛选条件）放在 `internal/ui/` 之外的普通 Go 结构里，通过指针传入渲染函数。这样：
-
-- 状态可被单元测试直接构造并断言
-- 渲染函数是纯函数式的（输入状态 → 输出操作列表）
-- 与 service 层的调用是直接的 Go 调用，不需要序列化
+- `service` 层是**唯一的业务逻辑落点**。CLI 命令、GUI 视图、MCP 工具都只做「解析参数 → 调 service → 格式化输出」
+- `driver` 层只做「把引擎原生语义翻译成核心抽象」
+- GUI 侧的 gpui 调用**收敛在 `seladb-gui` crate 内**，不外泄到 `core`/`driver`/`service`
 
 ---
 
-## 4. 需要自建的组件
+## 6. 组件策略
 
-| 组件 | 基于 | 预计规模 | 优先级 |
+### 6.1 自建清单
+
+| 组件 | 来源 | 规模估计 | 优先级 |
 |---|---|---|---|
-| 虚拟化数据表格 | `layout.List` | 800–1500 行 | P0 |
-| 树形导航 | 自建（`layout.List` 递归） | 300–500 行 | P0 |
-| 单元格类型渲染 | 领域类型 → 样式 | 200 行 | P0 |
-| SQL 编辑器 | `widget.Editor` + 自定义高亮 | 300 行 | P1 |
-| 分栏布局 | `layout` + 手写拖拽 | 400 行 | P1 |
-| 主题（深/浅） | `widget/material` 扩展 | 200 行 | P1 |
-| 对话框 / 菜单 | `widget/material` | 100 行 | P2 |
+| 虚拟化数据表格 | 改自官方 `data_table.rs` | 400–700 行 | P0 |
+| 树形导航（连接→库→schema→表→列） | 自建 | 300–500 行 | P0 |
+| 单元格类型渲染（类型着色 / NULL 样式 / BLOB 截断 / 时间格式） | 自建 | 200 行 | P0 |
+| SQL 编辑器 | 基于 gpui 文本系统 + tree-sitter 语法高亮 | 400–800 行 | P1 |
+| 分栏布局（可拖拽） | 自建 | 300 行 | P1 |
+| 主题（深色 / 浅色） | 基于 gpui 主题机制 | 200 行 | P1 |
+| 对话框 / 菜单 | gpui 基础能力 + 自建 | 150 行 | P2 |
 
-Gio 的 `widget/material` 提供了成套的基础控件（按钮、输入框、列表、开关等），可以直接用，不必全部自绘。
+### 6.2 语法高亮
+
+gpui 本身不含语法高亮。两种选择：
+
+1. **tree-sitter**（Zed 的方案）—— `tree-sitter-sql` + `tree-sitter-highlight`，增量解析，与编辑器一致
+2. **syntect**（egui 的方案）—— 基于 TextMate 语法，主题生态丰富
+
+数据库工具的 SQL 高亮建议走 tree-sitter：能拿到语法树做结构化分析（比如识别表名、列名做跳转），而不只是着色。
+
+### 6.3 语法高亮与数据渲染的一致性
+
+数据表格和 SQL 编辑器应该共享一套 token（数据库类型 → 颜色映射），都从 `design/tokens.json` 派生。
 
 ---
 
-## 5. 构建与分发
+## 7. 还原度策略
 
-### 5.1 CLI / MCP（纯 Go，无 CGO）
+GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原生方案里最高的。配合设计规范约束，可达 98–99% 视觉等价。
 
-与 ADR-0002 一致，三平台交叉编译零工具链依赖：
+**设计规范禁用清单**（Taffy / gpui 不支持或不等价的）：
 
-| 目标 | GOOS | GOARCH | CGO_ENABLED |
-|---|---|---|---|
-| macOS Apple Silicon | darwin | arm64 | 0 |
-| macOS Intel | darwin | amd64 | 0 |
-| Windows x64 | windows | amd64 | 0 |
-| Windows ARM64 | windows | arm64 | 0 |
-| Linux x64 | linux | amd64 | 0 |
-| Linux ARM64 | linux | arm64 | 0 |
-
-### 5.2 GUI
-
-| 目标 | 构建位置 | CGO | 备注 |
-|---|---|---|---|
-| macOS arm64 / amd64 | macOS runner | 1 | 需要 Xcode CLT |
-| Windows amd64 / arm64 | Windows runner | 0 | |
-| Linux amd64 / arm64 | Linux 容器 | 0（X11）/ 1（Wayland） | 构建时需 `libx11`、`libxkbcommon` 等 X11 开发包 |
-
-macOS 与 Windows 可以各自平台原生构建，不需要跨平台 GUI 交叉编译（cgo 交叉编译图形栈代价极高）。这与 CLI 的「交叉编译出包」策略不同，两条流水线应分开。
-
-### 5.3 分发格式
-
-| 平台 | 格式 | 工具 |
+| 禁用 | 原因 | 替代 |
 |---|---|---|
-| macOS | `.app` / `.dmg` | GoReleaser / `create-dmg` |
-| Windows | `.exe` / `.msi` | GoReleaser |
-| Linux | AppImage / `.deb` | GoReleaser |
+| CSS `filter` / `backdrop-filter` | gpui 无滤镜原语 | 纯色叠加 |
+| `mix-blend-mode` | 无混合模式 | 预烘焙颜色 |
+| 复杂 `mask` / `clip-path` | 只有基础裁剪 | 预渲染位图 |
+| `::before` / `::after` | 无伪元素 | 真实子元素 |
+| `::-webkit-scrollbar` | 无自定义滚动条 | 自行绘制（官方示例已有） |
+| CSS 缓动曲线 | 只有 spring 动画 | 弹簧参数预设档位 |
+
+**不被禁用**（gpui 原生支持）：Flexbox、Grid、绝对定位、盒模型、圆角、边框、阴影、渐变、透明度、SVG 图标、矢量路径、文本整形与换行。
+
+### 7.1 黄金图回归
+
+gpui 有 `visual_test.rs` 截图对比与 `toggle_headless` 无头模式。流程：
+
+1. `design/screenshots/` 存设计稿导出的 PNG
+2. 实现截图 → 与基准做像素 diff
+3. 设阈值（SSIM ≥ 0.98）进 CI
+
+**这把还原度从主观感受变成 CI 里可测量的数字。** 详见 [`ui-fidelity.md`](ui-fidelity.md)。
 
 ---
 
-## 6. 测试策略
-
-Gio 的 `unit` 包支持无头渲染，是本方案的一个额外红利：
-
-```go
-// 渲染到内存，与基准图做像素对比
-golden := unit.New(frame)
-img := golden.Image()
-```
-
-价值：
-
-- **UI 回归测试可以在 CI 跑**，不占开发者前台，不依赖真实显示器
-- 数据库结果集的表格渲染是高度确定性的（同样的数据 → 同样的图），适合做黄金图
-- 主题切换、行高变化、类型着色都能被断言
-
-注意：黄金图测试对字体渲染敏感，跨平台的字形抗锯齿会有细微差异。实践上按平台分别维护基准图（`testdata/golden/darwin/`、`linux/`、`windows/`）。
-
----
-
-## 7. 风险清单
+## 8. 风险
 
 | 风险 | 影响 | 应对 |
 |---|---|---|
-| Gio API 破坏性变更频繁 | 编译失败 | 全部 Gio 代码关在 `internal/ui/`；CI 每周试升级 |
-| 表格组件自建工作量超预期 | 工期延后 | **先做技术验证（见第 8 节），再决定是否继续** |
-| 中文 IME 在目标平台的实际表现 | SQL 编辑器难用 | 验证阶段必须在三平台实机测中文输入 |
-| macOS GUI 构建需要 cgo | 构建环境要求 | 独立 GUI 流水线，只在 macOS runner 上构建 |
-| Linux Wayland 需要 cgo | 与 X11 产物行为可能不同 | 统一用 X11 构建（纯 Go），Wayland 后续评估 |
-| 视觉体系从零做起 | 与主流应用观感有差距 | 用 `widget/material` 打底，再定制主题 |
-| 无现成图表组件 | 结果可视化缺失 | 暂缓，或用 Gio 绘图 API 自绘简单图表 |
+| **macOS 缺 Metal Toolchain** | 构建直接失败 | 一次性 `xcodebuild -downloadComponent MetalToolchain`；CI runner 预装并检查 |
+| **Windows 交叉编译需额外工具链** | 与跨平台目标冲突 | 用 Windows runner 原生构建，或装 mingw-w64 |
+| **独立生态规模小**（gpui 38 万下载 vs egui 2722 万） | 第三方参考资料与现成方案少 | 官方示例质量高；组件自建为主 |
+| **Zed 应用层组件 GPL 不可用** | 少一批现成控件 | 只用 Apache-2.0 部分；data_table 有参考实现 |
+| **冷编译 76s** | CI 慢 | 配 cargo 缓存；日常增量 0.99s 可接受 |
+| **gpui 由 Zed 单方面演进** | API 可能破坏 | 锁版本，按季评估升级；gpui 一年一版，升级频率天然低 |
+| **Text 排版细节与浏览器有差** | 像素级无法一致 | 黄金图阈值留余量；中英混排换行由 Taffy + gpui 文本系统保证基本一致 |
 
 ---
 
-## 8. 前置技术验证（建议先做）
+## 9. 与 Go + Gio 方案的取舍
 
-验证项与判定标准见 [`gui-framework-survey.md`](gui-framework-survey.md) 第 5 节。Gio / Ebiten / Slint 三个方案共用同一套测试数据与断言，便于横向对比。
+| 维度 | Rust + GPUI | Go + Gio |
+|---|---|---|
+| 冷编译 | 76s | **9.3s** |
+| 增量（改一行） | 0.99s | **0.83s** |
+| 交叉编译 Windows | 需 mingw-w64 | **零工具链** |
+| macOS 构建前置 | 需 Metal Toolchain | 无 |
+| CSS Grid 支持 | ✅ Taffy | ❌ |
+| 数据表参考实现 | ✅ 官方 473 行 | ❌ 自建 800–1500 行 |
+| 中文 IME | ✅ 完整逐平台 | ✅ 完整逐平台 |
+| 版本可锁性 | ✅ 一年一版 | ❌ 必须跟 main |
+| 维护主体 | 公司 | 个人 |
+| 产物体积 | **5.6M** | 8.9M |
+| 语言栈 | 单一 Rust | 单一 Go |
 
-在正式投入 GUI 开发前，先做一个 2–3 天的 spike，只回答三个问题：
+**结论：两者各有胜负，但 GPUI 在「原生 GUI 能力」这一侧优势明显，而 Go 的优势（编译速度）经实测只在冷编译体现。**
 
-1. **虚拟化表格**：10 万行结果集，滚动是否流畅？横向滚动与列头是否同步？列宽拖拽是否可用？
-2. **中文输入**：macOS / Windows / Linux 实机上，SQL 编辑器里输入中文注释是否正常？候选窗位置是否正确？
-3. **IME + 虚拟滚动共存**：输入法预编辑串（preedit）是否会被虚拟滚动打断？
-
-这三个问题的答案直接决定 Gio 是否可用。如果第 2 项在三平台上有平台性问题，需要准备「GUI 用 Gio、中文输入退化为直接粘贴」的降级方案，或者重新评估 Fyne。
-
-验证代码放在 `spike/` 目录，不进主分支。
+如果「还原度 + 原生 GPU」是硬需求 → **GPUI**。
+如果「零构建摩擦 + 三平台一键交叉编译」是硬需求 → Go + Gio，但表格与 Grid 要自建。
 
 ---
 
-## 9. 待定项
+## 10. 待定项
 
-- **主题**：深色为主，还是深浅双主题
-- **字体**：**已明确用系统字体**（见 2.6），不需要内置中文字体。仍待定的是是否额外内置一套西文/等宽字体以保证跨平台视觉一致
-- **首启字体扫描延迟**：首次启动 0.2–0.5 秒的字体索引扫描，需要设计加载流程避免白屏
-- **图表**：结果分布可视化是否做，用什么方案
+- **GUI 主题**：深色为主还是深浅双主题
+- **字体**：gpui 默认走系统字体（`font-kit`），是否额外内置一套保证跨平台一致
+- **图表**：结果分布可视化是否做
 - **首批引擎**：建议 Postgres + MySQL + SQLite，与 GUI 表格组件同步推进
+- **Cargo 工作区结构**：单 crate 还是多 crate workspace（建议多 crate，天然分离 CLI/GUI/MCP）

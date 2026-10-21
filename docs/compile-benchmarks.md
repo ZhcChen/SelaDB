@@ -8,17 +8,20 @@
 
 ## 1. 数据
 
-| 指标 | Go 1.26.8 + Gio v0.10.3 | Rust 1.99 + eframe 0.37 |
-|---|---|---|
-| **冷编译**（下载依赖 + 编译全部依赖） | **9.3s** | 62.2s |
-| **增量**：改一行（debug，日常开发路径） | 0.83s | **0.62s** |
-| **增量**：改一行（release） | 0.80s | 0.81s |
-| **交叉编译 Windows x64**（依赖已缓存） | **0.49s** | ❌ 失败 |
-| **交叉编译 Windows x64**（依赖冷编译） | 3.8s | ❌ 失败（MSVC target 缺 `link.exe`） |
-| 产物 macOS | **8.9M** | 13M (release) / 65M (debug) |
-| 产物 Windows x64 | 9.1M | — |
+| 指标 | Go 1.26.8 + Gio v0.10.3 | Rust 1.99 + eframe 0.37 | Rust 1.99 + gpui 0.2.2 |
+|---|---|---|---|
+| **冷编译**（下载依赖 + 编译全部依赖） | **9.3s** | 62.2s | ~76s |
+| **增量**：改一行（debug，日常开发路径） | 0.83s | **0.62s** | 0.99s (release) |
+| **增量**：改一行（release） | 0.80s | 0.81s | 0.99s |
+| **交叉编译 Windows x64**（依赖已缓存） | **0.49s** | ❌ 失败 | ❌ 失败 |
+| **交叉编译 Windows x64**（依赖冷编译） | 3.8s | ❌ 失败（MSVC target 缺 `link.exe`） | ❌ 失败 |
+| 产物 macOS | 8.9M | 13M (release) / 65M (debug) | **5.6M** |
+| 产物 Windows x64 | 9.1M | — | — |
+| macOS 构建前置 | 无 | 无 | **需 Metal Toolchain 组件（838.9 MB）** |
 
-Rust 依赖树包含 wgpu、resvg、egui-winit、egui-wgpu 等，编译量远大于 Go 侧的 Gio。
+Rust 依赖树包含 wgpu、resvg、egui-winit、egui-wgpu（eframe 侧）或 blade-graphics、gpui 平台层（gpui 侧），编译量远大于 Go 侧的 Gio。
+
+gpui 那一列是**实际独立编译官方 `examples/data_table.rs` 测得的**：新建空项目，只依赖 crates.io 上的 `gpui = "0.2"` 与 `rand = "0.9"`，构建成功，链接到 `Metal.framework` + `QuartzCore.framework`。
 
 ---
 
@@ -60,7 +63,15 @@ Go 则是 `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build` 一条命令，**�
 
 **这一点与项目的「跨平台」目标直接相关**，且比编译速度更重要。
 
-### 2.3 API 稳定性：Rust 侧也不比 Go 好多少
+### 2.3 gpui 的 API 稳定性反而优于 Gio
+
+gpui 0.2.0 / 0.2.1 / 0.2.2 **全部发布于 2025 年 10 月**（10-09 / 10-14 / 10-22），之后整整一年没有新版本。**一年一版 = 可以正常锁版本、可以计划性升级。**
+
+对比 Gio：官方明说 0.x 阶段每次 minor 升级都是破坏性变更、tags 不回移 bugfix、必须跟 `main` 分支。
+
+这是 Rust 侧相对 Go 侧的一个反直觉优势。
+
+### 2.4 API 稳定性：Rust 侧也不比 Go 好多少
 
 实测 eframe 0.37 时踩到的真实破坏性变更 —— `eframe::App` trait：
 
@@ -77,9 +88,9 @@ fn logic(&mut self, cx: &mut Context)   // 新增，在 ui 之前调用
 
 > 更正：本文档早期版本曾称「egui 用语义化版本，比 Gio 稳定」。该说法不准确 —— 0.x 阶段的 minor 升级都是破坏性的，egui 与 Gio 在这一点上处境相同。
 
-### 2.4 产物体积
+### 2.5 产物体积
 
-Go 8.9M / Rust 13M(release) —— 差距不大。但 **Rust 的 debug 产物 65M**，比 Go 大一个数量级。开发期频繁拷贝/上传产物时会有差别。
+Go 8.9M / eframe 13M(release) / **gpui 5.6M** —— gpui 甚至比 Go 的 Gio 还小。eframe 的 debug 产物 65M，比 Go 大一个数量级。开发期频繁拷贝/上传产物时会有差别。
 
 ---
 

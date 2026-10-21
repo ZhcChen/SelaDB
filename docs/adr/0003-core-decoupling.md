@@ -11,11 +11,11 @@
 
 ## 决策
 
-**引入 `internal/service` 用例编排层，作为业务逻辑的唯一落点。** 三种外壳都只做三件事：解析参数 → 调用 service 方法 → 格式化输出。
+**引入 `seladb-core/src/service` 用例编排层，作为业务逻辑的唯一落点。** 三种外壳都只做三件事：解析参数 → 调用 service 方法 → 格式化输出。
 
-- `internal/core` 定义领域模型（连接、库、schema、表、列、结果集）
-- `internal/driver` 定义引擎无关的抽象，由各引擎包实现
-- `internal/service` 编排核心能力，**不感知具体外壳，也不感知具体引擎**
+- `seladb-core/src/core` 定义领域模型（连接、库、schema、表、列、结果集）
+- `seladb-core/src/driver` 定义引擎无关的抽象，由各引擎模块实现
+- `seladb-core/src/service` 编排核心能力，**不感知具体外壳，也不感知具体引擎**
 - CLI / GUI / MCP 分别作为 service 的消费者存在
 
 配套约束：
