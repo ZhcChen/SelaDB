@@ -1,0 +1,91 @@
+# ---- 操作系统 ----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# ---- 编辑器 / IDE ----
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# ---- 构建产物 ----
+build/
+dist/
+out/
+target/
+bin/
+obj/
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.pdb
+*.class
+*.jar
+*.war
+*.apk
+*.aab
+*.ipa
+
+# ---- 依赖 ----
+node_modules/
+vendor/
+Pods/
+Carthage/
+.pnpm-store/
+.yarn/
+
+# ---- 环境与密钥 ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+
+# ---- 日志与临时文件 ----
+*.log
+logs/
+tmp/
+temp/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# ---- 数据库本地文件 ----
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# ---- 测试与覆盖率 ----
+coverage/
+.nyc_output/
+.pytest_cache/
+.tox/
+
+# ---- 打包产物 ----
+*.app/
+*.dmg
+*.pkg
+*.msi
+*.AppImage
+*.deb
+*.rpm
+*.snap
