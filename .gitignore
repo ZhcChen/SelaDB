@@ -93,3 +93,6 @@ coverage/
 *.deb
 *.rpm
 *.snap
+
+# Rust
+target/
