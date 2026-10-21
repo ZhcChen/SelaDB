@@ -1,0 +1,46 @@
+# 仓库级换行符策略
+#
+# 目的：让 SelaDB 的跨平台协作不受各人 Git 配置差异影响。
+# 覆盖全局 attributes（/Users/chen/.config/git/attributes）的同名规则，
+# 因为全局文件只存在于各自本机，克隆仓库的贡献者拿不到。
+#
+# 两条硬规则：
+#   1. POSIX shell 脚本永远是 LF —— CRLF 会让 bash 报 "\r: command not found"
+#   2. Windows 批处理 / PowerShell 脚本检出时是 CRLF
+
+* text=auto
+
+# ---- POSIX shell ----
+*.sh text eol=lf
+*.bash text eol=lf
+
+# ---- Windows 脚本 ----
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ---- 构建与容器 ----
+Makefile text eol=lf
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+.gitattributes text eol=lf
+.githooks/* text eol=lf
+
+# ---- 二进制资源，不做换行转换 ----
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
