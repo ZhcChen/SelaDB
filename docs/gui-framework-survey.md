@@ -91,7 +91,9 @@ case "metal":   graphicsLibrary = GraphicsLibraryMetal
 
 egui 的生态指标最亮眼：2700 万次下载、700 万次近期下载、Rerun 公司背书、2020 年至今 67 个版本、MIT OR Apache-2.0。
 
-### 3.1 egui 的中文 IME 是硬伤
+> **本节的 IME 判断已按 issue 正文核实后修正**，见下方每条 issue 的实际内容。编译速度的实测数据见 [`compile-benchmarks.md`](compile-benchmarks.md)。
+
+### 3.1 egui 的中文 IME：Wayland 正常，X11 + Fcitx5 有边界问题
 
 我查了 emilk/egui 的 issue tracker，**IME 相关 issue 共 42 个**，其中大量仍处于 open 状态：
 
@@ -110,11 +112,19 @@ egui 的生态指标最亮眼：2700 万次下载、700 万次近期下载、Rer
 
 历史上还有一条已关闭的 [#962](https://github.com/emilk/egui/issues/962)「Rendering of Chinese characters is very slow」。
 
-**有一条 open issue 的标题直接就是「Add native Chinese support」** —— 也就是说 egui 到 0.37.0 为止，连「原生中文支持」都还在待办里。
+逐条核实 issue 正文后的准确结论：
 
-对比 Gio：`app/ime.go` 是完整的文本输入协议实现（preedit、commit、surrounding text、UTF-16 ↔ rune 索引转换），逐平台适配。这是一个**结构性差距**，不是「多点几次能绕过去」的问题。
+| Issue | 正文要点 | 状态 |
+|---|---|---|
+| [#7975](https://github.com/emilk/egui/issues/7975)（2026-03） | **Wayland + IBus 下 IME pre-edit 在 TextEdit 中显示正常**（附中/韩文截图）；X11 + Fcitx5 下 pre-edit 不在 TextEdit 内。报告者明说「**这对中文或日文 IME 不是什么大问题**」，但韩文失焦会丢未提交字符。另注：0.33.3 更糟，IME 仅在光标位于开头时可用 | open |
+| [#2024](https://github.com/emilk/egui/issues/2024)（2022-09） | Linux X11 + iBus 下 iBus 未被调用 | open，仅 1 条评论，已陈旧 |
+| [#8720](https://github.com/emilk/egui/issues/8720)（2026-10-15） | 标题是「Add native Chinese support」，但正文要的是 **UI 本地化与文档翻译**，**不是输入法** | open，4 条评论 |
 
-对 SelaDB 来说，SQL 编辑器要写中文注释、表名和字段名大概率是中文、查询条件含中文 —— 这条是硬指标。
+**所以「egui 中文 IME 是硬伤」这个说法过头了。** 准确说法是：**egui 的 IME 在 Wayland + IBus 上工作正常，X11 + Fcitx5 组合有边界问题，且对中文影响有限**。这与 Fyne 的处境是同一量级，并不构成把 Rust 排除的理由。
+
+egui 的**字体**方面没问题：`epaint` 0.37 引入 `FontProvider` 机制，区分「配置字体」与「按需发现字体」，eframe 在 `system_fonts` feature 下安装系统字体提供者，缺字时能自动发现并回退到含该字形的系统字体。默认字体是 Ubuntu-Light + Hack（无 CJK），但有系统字体兜底。
+
+Gio 的 `app/ime.go` 仍是完整的文本输入协议实现（preedit、commit、surrounding text、UTF-16 ↔ rune 索引转换），逐平台适配，覆盖面比 egui 完整。
 
 egui 的**字体**方面倒是没问题：`epaint` 0.37 引入了 `FontProvider` 机制，区分「配置字体」与「按需发现字体」，eframe 在 `system_fonts` feature 下会安装系统字体提供者，缺字时能自动发现并回退到含该字形的系统字体。默认字体是 Ubuntu-Light + Hack（无 CJK），但有系统字体兜底。
 
@@ -304,7 +314,7 @@ GPUI 的还原度是所有候选里最高的（Taffy 同源布局算法 + Tailwi
 
 **Rust 生态确实更宽，但要选对框架：**
 
-- ❌ **egui 不行** —— 组件最好（虚拟化表格 + 语法高亮现成），但中文 IME 是硬伤，有个 open issue 标题就是「Add native Chinese support」
+- ✅ **egui 可以** —— 组件最好（虚拟化表格 + 语法高亮现成）、维护主体是公司（Rerun）、社区 2700 万下载、无头快照测试成熟。中文 IME 在 Wayland + IBus 正常，X11 + Fcitx5 有边界问题（对中文影响有限）
 - ✅ **Slint 可以** —— 真正原生 GPU 渲染（Skia），桌面端中文 IME 可用，版本稳定（1.18.1）且有商业支持
 - ⚠️ **Tauri** —— IME 完美、组件生态最好，但那是 WebView 路线，与「原生 GPU 渲染」的需求冲突；且 Tauri v3 还在 alpha
 
