@@ -410,6 +410,17 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 真正的解法是**把设计源与实现解耦**（design token + 黄金图回归），而不是换一个更底层的框架。
 
+### 3.7 「HTML/CSS 风格接口」路线（Zig 自研 CSS 引擎）
+
+若诉求是「用 HTML/CSS 的熟悉写法描述界面，但底层自绘」，完整可行性与成本分析见
+[`css-dsl-strategy.md`](css-dsl-strategy.md)。要点：
+
+- **Flexbox 有捷径**：Yoga 是 C++/MIT，`zig cc` 直接编译 + FFI，不用自己写
+- **CSS Grid 无捷径**：Zig 生态没有现成实现，Yoga 只做 flex
+- **inline 行内布局建议明确不支持**：line box / baseline / strut 极难，app UI 用不到
+- **成本 8–18 个月**，且自研并不改变还原度上限（仍然没有浏览器的级联完备性）
+- **自研换来的不是保真度而是控制权**；真正省事的路径是 design token 单一设计源 + 黄金图回归，或写一个 CSS→目标框架的转译器（2000–3000 行，几周）
+
 ---
 
 ## 4. 根本矛盾：原生 GPU 渲染 与 100% 复刻 Web 设计稿 不可兼得
