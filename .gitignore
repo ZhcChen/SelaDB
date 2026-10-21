@@ -58,6 +58,10 @@ Carthage/
 *.pfx
 secrets.*
 
+# ---- Agent 本机状态（保留项目级 skills 供团队共享）----
+.minimax/*
+!.minimax/skills/
+
 # ---- 日志与临时文件 ----
 *.log
 logs/
