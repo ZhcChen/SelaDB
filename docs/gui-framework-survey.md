@@ -325,6 +325,29 @@ use: xcodebuild -downloadComponent MetalToolchain
 | 依赖滤镜 / 毛玻璃 / 复杂动画 / 自定义滚动条 | **70–80%** |
 | 像素级 1:1 | **不可能** |
 
+### 3.5 横向对照：控件库与测试基建（选型的真正决定性维度）
+
+前面比的是「能不能渲染」。但对产品落地来说，**有没有可商用的控件库**和**能不能做无头 UI 回归测试**同样关键。许可证均从上游仓库的 Cargo.toml / LICENSE 实读：
+
+| 框架 | 可商用控件库 | 无头测试 / 截图 | 渲染后端 | 中文 IME | 版本可锁 |
+|---|---|---|---|---|---|
+| **gpui** 0.2.2 | ❌ Zed 的 `crates/ui`、`crates/component` 是 **GPL-3.0-or-later**，未发布 | ❌ 无（需开真窗口 + `screencapture`） | Metal / D3D11 / Vulkan | ✅ 逐平台完整 | ⚠️ 跟随 Zed |
+| **egui** 0.37.0 | ✅ `egui_extras` MIT OR Apache-2.0 | ✅ `egui_kittest` | wgpu | ⚠️ Wayland+IBus 正常，X11+Fcitx5 边界问题 | ✅ 稳定 |
+| **slint** 1.18.1 | ⚠️ GPL-3.0-only OR Slint-Royalty-free-2.0（双许可，非 MIT/Apache） | ✅ | Skia | ✅ 桌面端可用 | ✅ |
+| **Fyne** 2.8.2 | ✅ **BSD-3-Clause**，自带完整控件 | ✅ | **仅 OpenGL** | ⚠️ 3 个 open issue | ✅ |
+| **Gio** 0.10.3 | ✅ MIT/UNLICENSE，自带 `widget/material` | ✅ `unit` 包 | Metal / D3D11 / Vulkan | ✅ 协议级完整 | ❌ 0.x 政策 |
+
+**没有哪个框架是全绿的。** 按需求交叉：
+
+- 要 **可商用控件库** → egui / Fyne / Gio
+- 要 **原生 GPU 后端** → gpui / Gio / egui / Slint
+- 要 **中文 IME 可靠** → gpui / Gio / Slint
+- 要 **无头 UI 回归** → egui / Slint / Fyne / Gio
+
+**Gio 是唯一「可商用控件 + 原生 GPU + 可靠 IME + 无头测试」四项全中的**，代价是依赖不能锁版本。
+
+**gpui 的长板与短板刚好互补**：后端与 IME 是最强的，但可商用控件库和测试基建要自己补 —— 而这正好是 Gio 已经有的。
+
 ---
 
 ## 4. 根本矛盾：原生 GPU 渲染 与 100% 复刻 Web 设计稿 不可兼得
