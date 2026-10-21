@@ -163,11 +163,122 @@ Go 二进制作为「引擎」被 GUI 拉起，两边共用同一份协议定义
 - 需要维护一份跨语言协议定义（可用 JSON Schema / protobuf 生成）
 - 调试链路变长
 
+### 3.4 GPUI（Zed 的框架）：还原度最好，但有两个否决级问题
+
+`gpui` crate 已单独发布到 crates.io（**0.2.2，Apache-2.0**），可独立使用。
+
+#### 技术指标
+
+| 维度 | 实现 |
+|---|---|
+| 布局 | **Taffy 0.13**，features 开启 `flexbox` / `grid` / `block_layout` / `float_layout` / `content_size` —— 与浏览器同源的 CSS 布局算法集 |
+| 渲染 | macOS **Metal**（`gpui_macos`）、Windows **D3D12/Vulkan**（`gpui_windows`）、Linux **Vulkan**（`gpui_linux`）、另有 `gpui_wgpu`、`gpui_web` |
+| 绘制 | `lyon`（路径）、`resvg`/`usvg`（SVG）、阴影、透明度、pattern |
+| 字体 | `font-kit`（Zed 的 fork，跨平台系统字体发现）+ `ttf-parser` + `swash`（HarfBuzz 移植） |
+| 无障碍 | `accesskit` |
+| 平台 | `gpui_macos` / `gpui_linux` / `gpui_windows` / `gpui_apple` / `gpui_ios` / `gpui_web` |
+| 可测试 | `toggle_headless` 无头示例 + `platform/visual_test.rs` 截图对比 |
+
+API 是 builder 风格，形如 Tailwind 的 utility class：
+
+```rust
+div().flex().flex_col().gap_3().bg(rgb(0x505050)).size(px(500.))
+   .justify_center().items_center().shadow_lg().border_1()
+   .border_color(rgb(0x0000ff)).text_xl().text_color(rgb(0xffffff))
+   .child(...)
+```
+
+官方示例里直接有 `uniform_list`（虚拟化列表）、`grid_layout`、`tree`、`text`、`text_wrapper`、`shadow`、`svg`、`a11y`、`toggle_headless` —— 对数据库工具来说该有的骨架都有。
+
+#### 问题一：组件库是 GPL-3.0-or-later，且未发布
+
+| crate | license | 发布状态 |
+|---|---|---|
+| `gpui` | **Apache-2.0** | ✅ 已发布（crates.io 0.2.2） |
+| `ui`（Zed 组件库） | **GPL-3.0-or-later** | ❌ 未发布 |
+| `component` | **GPL-3.0-or-later** | ❌ 未发布 |
+
+Zed 工作区根 `Cargo.toml` 写着 `[workspace.package] publish = false`，而 `crates/ui`、`crates/component` 用 `publish.workspace = true` 继承 —— 结果是 **false**，crates.io 上查无此包（索引返回空）。
+
+后果有两层：
+
+1. **许可证**：SelaDB 若依赖 Zed 的组件库（Button / Input / Table / Tree 等现成控件），GPL-3.0 的传染性会要求 SelaDB 整体以 GPL-3.0 分发。对一个数据库管理软件，这通常不可接受。
+2. **只能用 git path 依赖**：`git = "https://github.com/zed-industries/zed"` + `path = "crates/ui"`，等于把整个 Zed 仓库拖进构建。
+
+**只能用 `gpui` 本体（Apache-2.0）的话，组件全部自建** —— 处境和 Gio 相同，但可选的现成件更少（Gio 至少有 `widget/material` 的成套基础控件）。
+
+#### 问题二：GPUI 与 Zed 绑定
+
+gpui.rs 官网原文：
+
+> For the near future, GPUI is tied to Zed, so contributions will need to be made there and kept in sync with it.
+
+即：GPUI 的版本节奏由 Zed 决定，而 Zed 是每天几十个 commit 的高速迭代项目。这比 Gio 的「0.x 不回移 bugfix」更不稳定 —— Gio 至少是一个聚焦的小项目，GPUI 是大项目的一个子模块。
+
+#### 还原度评估：GPUI 确实是四者里最接近 Web 的
+
+**能做到的**：
+
+- 布局层面 **Taffy 与浏览器同源**，Flexbox / Grid / Block / Float 的语义、盒模型、gap、aspect-ratio 都能对上
+- 视觉属性：圆角、阴影、渐变、边框、透明度、SVG 图标都有
+- 字体：系统字体发现 + swash 整形，CJK 覆盖没问题
+- API 形态接近 Tailwind，设计稿的 utility 风格可一对一手写
+
+**做不到的**：
+
+| Web 能力 | GPUI 现状 |
+|---|---|
+| CSS 选择器 / 级联 / 伪类 | ❌ 无。GPUI 里的 "selector" 只是 `debug_selector`（测试句柄，如 `debug_selector(\|\| "MENU".into())`）。设计稿的 `.card:hover{}` 必须翻译成 `div().hover(\|s\| s.bg(...))`，**每个状态手写映射** |
+| CSS transition / @keyframes | ❌ 无。只有 `spring.rs` 弹簧动画，缓动曲线要重新实现 |
+| `backdrop-filter` / `blur()` / `filter: drop-shadow` | ❌ 无等价物 |
+| `mix-blend-mode` | ❌ 无 |
+| CSS mask / 复杂 `clip-path` | ❌ 无 |
+| `::-webkit-scrollbar` 自定义滚动条 | ❌ 无 |
+| `::before` / `::after` 伪元素 | ❌ 无 |
+| DOM / CSSOM | ❌ 无。浏览器那套「devtools 调样式 → 抄进代码」的流程不成立 |
+| 像素级文本渲染 | ❌ 字距、连字、字体回退顺序、subpixel 抗锯齿均与浏览器不同 |
+
+**现实还原度**：
+
+| 设计稿类型 | 可达还原度 |
+|---|---|
+| 规整 flex/grid 布局 + 常规控件（卡片、表格、按钮、输入框） | **90–95%** |
+| 依赖滤镜 / 毛玻璃 / 复杂动画 / 自定义滚动条 | **70–80%** |
+| 像素级 1:1 | **不可能** |
+
 ---
 
-## 4. 结论
+## 4. 根本矛盾：原生 GPU 渲染 与 100% 复刻 Web 设计稿 不可兼得
 
-### 4.1 回答「Go 里只有 Gio 合适吗」
+这是整个选型里最需要摊开讲的一点。
+
+**原生渲染框架不是浏览器，没有 CSS 引擎。** GPUI 已经是四者里最接近的（Taffy 同源算法 + Tailwind 风格 API），也只到 90–95%。Gio 更早一层（布局是自研的 flex/absolute/flexible space，没有 grid 布局）。
+
+但要注意一个常被忽略的事实：**WebView 本身也是 GPU 加速渲染的**。WKWebView、WebView2、WebKitGTK 的网页合成都在 GPU 上跑。所谓「原生 GPU 渲染」与「WebView」的区别不是「GPU vs CPU」，而是「你自己写绘制代码 vs 浏览器替你画」。
+
+| 路线 | 还原度 | 产物体积 | 内存 | 启动 | 语言栈 |
+|---|---|---|---|---|---|
+| Web（系统 webview） | **100%** | 10–20MB | 中 | 中 | Go + Web |
+| Web（Electron 捆绑 Chromium） | 100% | 100MB+ | 高 | 慢 | Go/Rust + Web |
+| 原生（Gio / Ebiten / GPUI） | 70–95% | 10–20MB | 低 | 快 | 纯 Go 或 Go+Rust |
+
+所以真正的取舍是：**「100% 复刻设计稿」和「纯 Go 单语言栈 + 极致轻快」，二选一。**
+
+### 务实的中间路径
+
+如果两条都想要，采用「**设计源与实现分离**」：
+
+1. **设计源定成 design token 文件**（颜色 / 间距 / 字号 / 圆角 / 阴影 / 动效时长），而不是 HTML。HTML 只作为可视化草图与交互原型
+2. token 用一份 JSON/YAML 描述，Go 侧和前端侧共用同一份 → 翻译是机械映射，不会漂移
+3. **像素级回归用黄金图**：Gio 的 `unit` 包、GPUI 的 `visual_test.rs`、egui 的 `egui_kittest` 都能在无头环境截图。把「设计稿渲染图」与「实现截图」做像素 diff，就能量化还原度并防止回归
+
+第 3 点尤其值得做 —— 它把「还原度」从主观感受变成可测量的数字。
+
+---
+
+## 5. 结论
+
+### 5.1 回答「Go 里只有 Gio 合适吗」
 
 **不是只有 Gio，但其它方案各有硬伤：**
 
@@ -178,7 +289,16 @@ Go 二进制作为「引擎」被 GUI 拉起，两边共用同一份协议定义
 
 **Gio 仍然是「全 Go + 原生 GPU + 靠谱中文输入」三项同时满足的唯一方案。**
 
-### 4.2 回答「不行就用 Rust」
+### 5.1.1 GPUI 的位置：不是 Go 方案，但值得单列
+
+GPUI 的还原度是所有候选里最高的（Taffy 同源布局算法 + Tailwind 风格 API + 视觉测试），但两个问题对 SelaDB 是**否决级**的：
+
+1. **组件库 GPL-3.0-or-later 且未发布** —— 用了就把 SelaDB 拖进 GPL 分发；不用就只剩 `gpui` 本体，组件全自建
+2. **与 Zed 绑定** —— 版本跟着每天几十个 commit 的 Zed 走，比 Gio 更不稳定
+
+如果 SelaDB 确定开源并接受 GPL-3.0，GPUI 值得重新评估；如果要闭源或用宽松许可证，直接排除。
+
+### 5.2 回答「不行就用 Rust」
 
 **Rust 生态确实更宽，但要选对框架：**
 
@@ -186,9 +306,15 @@ Go 二进制作为「引擎」被 GUI 拉起，两边共用同一份协议定义
 - ✅ **Slint 可以** —— 真正原生 GPU 渲染（Skia），桌面端中文 IME 可用，版本稳定（1.18.1）且有商业支持
 - ⚠️ **Tauri** —— IME 完美、组件生态最好，但那是 WebView 路线，与「原生 GPU 渲染」的需求冲突；且 Tauri v3 还在 alpha
 
-### 4.3 我的建议
+### 5.3 我的建议
 
-**先不换栈，按这个顺序做验证：**
+**第一步先定「还原度」是不是硬需求。** 这是所有分支的根：
+
+- **如果「100% 复刻 HTML/CSS 设计稿」是硬需求** → 必须走 Web 路线。此时 **Wails v2（Go + 系统 webview）是被低估的平衡点**：后端、CLI、MCP、GUI 壳全是 Go，前端用 Web 技术，设计稿 100% 复刻，产物 10–20MB（远小于 Electron 的 100MB+）。需要放弃的是「自己写 GPU 绘制代码」，但 webview 内部同样是 GPU 加速合成
+- **如果「原生 GPU 渲染 + 纯 Go 单栈 + 极致轻快」是硬需求** → 接受 90–95% 的还原度上限，选 Gio 或 Ebiten
+- **如果两条都要** → 走「design token 分离 + 黄金图回归」路线（见第 4 节）
+
+**定完之后按这个顺序做验证：**
 
 1. **spike 验证 Gio**（2–3 天）：10 万行虚拟化表格、中文输入三平台实测、IME 与虚拟滚动共存
 2. **spike 验证 Ebiten**（1–2 天）：同样的三项，额外看 CJK 排版质量和桌面交互能力
@@ -200,7 +326,7 @@ Go 二进制作为「引擎」被 GUI 拉起，两边共用同一份协议定义
 
 ---
 
-## 5. 待验证清单（三方案通用）
+## 6. 待验证清单（三方案通用）
 
 | 验证项 | 判定标准 | 对应风险 |
 |---|---|---|
