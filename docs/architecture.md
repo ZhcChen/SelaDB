@@ -25,9 +25,9 @@ SelaDB 采用「一个核心，多种外壳」的结构。核心库负责所有�
             ┌───────────────────────┼───────────────────────┐
             │                       │                       │
     ┌───────▼────────┐    ┌─────────▼─────────┐    ┌────────▼────────┐
-    │  CLI (Go)      │    │  GUI (Go + Web)    │    │  MCP Server(Go) │
-    │  Bubble Tea v2 │    │  Wails v2          │    │  官方 go-sdk    │
-    │  + Cobra       │    │  原生桌面窗口       │    │  核心操作→工具   │
+    │  CLI (Go)      │    │  GUI (Go + Gio)   │    │  MCP Server(Go) │
+    │  Bubble Tea v2 │    │  Metal/D3D11/     │    │  官方 go-sdk    │
+    │  + Cobra       │    │  Vulkan 原生渲染   │    │  核心操作→工具   │
     └───────┬────────┘    └─────────┬─────────┘    └────────┬────────┘
             │                       │                       │
             └───────────────────────┴───────────────────────┘
@@ -52,10 +52,9 @@ SelaDB 采用「一个核心，多种外壳」的结构。核心库负责所有�
 | CLI 交互界面 | `charmbracelet/bubbletea` v2 | v2.1.0 | v2 已于 2026-10 转正；纯 Go，Elm 架构，适合做表格式数据浏览 |
 | CLI 样式 | `charmbracelet/lipgloss` v2 | v2.0.6 | 与 Bubble Tea v2 同代，布局与颜色统一 |
 | CLI 组件库 | `charmbracelet/bubbles` v2 | v2.2.1 | 现成的 table / viewport / textarea / list |
-| GUI 框架 | `wailsapp/wails` v2 | v2.17.0 | Go 后端 + 系统 WebView，产物小；**v3 至今仍是 beta**（v3.0.0-beta.34），不采用 |
-| GUI 前端 | Web 技术（框架待定） | — | 数据表格、树视图、图表、中文输入法均无短板 |
+| GUI 框架 | `gioui.org`（Gio） | v0.10.3 | Go 直接走平台原生 GPU：macOS Metal、Windows D3D11、Linux Vulkan；中文输入法是协议级完整实现 |
 
-> **关于 GUI 前端**：Wails 只要求「后端是 Go」。界面层用 Web 技术是桌面开发的主流做法，不代表项目不是 Go 项目。所有业务逻辑、驱动、协议处理全在 Go 侧。
+> **关于 GUI**：需求确定为「Go + 原生平台 GPU 渲染」，因此不采用系统 WebView 路线（Wails / Electron）。Gio 的代价是无现成的 Table 与 Tree 组件，需基于 `layout.List` 自建（预计 800–1500 行 + 300–500 行）。完整方案见 [`docs/gui-architecture.md`](gui-architecture.md)。
 
 ### 2.2 MCP 与协议层
 
@@ -97,7 +96,7 @@ SelaDB/
 ├── go.mod
 ├── cmd/
 │   ├── seladb/              # CLI 入口：子命令 + 交互式 TUI
-│   ├── seladb-gui/          # GUI 入口（Wails，後期）
+│   ├── seladb-gui/          # GUI 入口（Gio，後期）
 │   └── seladb-mcp/          # MCP Server 入口
 ├── internal/
 │   ├── core/                # 领域模型：连接、数据库对象、列元数据
@@ -121,7 +120,7 @@ SelaDB/
 ├── docs/
 │   ├── architecture.md      # 本文件
 │   └── adr/                 # 架构决策记录
-├── web/                     # Wails 前端资源
+├── internal/ui/             # Gio 界面层（唯一的 gioui.org import 边界）
 └── .specify/                # Spec Kit 工作流
 ```
 
@@ -205,7 +204,7 @@ func (s *Service) Execute(ctx context.Context, connID, sql string) (*ExecResult,
 
 - CLI：`seladb tables --conn prod --json` → 调 `ListTables` → JSON 编码
 - MCP：工具 `list_tables` → 调 `ListTables` → JSON 编码（几乎同构）
-- GUI：Wails 绑定 `ListTables` → 返回 JSON → 前端渲染
+- GUI：`internal/ui/` 直接调 `ListTables` → 拿到领域类型 → Gio 渲染
 
 ### 4.3 结果集统一模型
 
@@ -290,22 +289,22 @@ description: 查询 SelaDB 中已配置的数据库连接。当用户提到某�
 
 三平台交叉编译**不需要任何额外工具链**（本机无 mingw-w64 也能出 Windows 包）。这是坚持纯 Go 的直接收益。
 
-### 7.2 GUI（Wails v2）
+### 7.2 GUI（Gio）
 
-| 目标平台 | 构建方式 | 额外依赖 |
-|---|---|---|
-| macOS | `GOOS=darwin go build` | 无 |
-| Windows | `GOOS=windows go build` | 无（运行时需 WebView2，Win11 自带，Win10 需装 Evergreen） |
-| Linux | 容器内构建 | `libwebkit2gtk-4.1-dev` + CGO |
+| 目标平台 | 构建方式 | CGO | 额外依赖 |
+|---|---|---|---|
+| macOS arm64 / amd64 | macOS runner 原生构建 | 1 | Xcode CLT（Gio 的 `app/os_darwin.m` 需要 cgo） |
+| Windows amd64 / arm64 | Windows runner 原生构建 | 0 | 无（D3D11 / EGL 路径均为纯 Go） |
+| Linux amd64 / arm64 | Linux 容器构建 | 0（X11）/ 1（Wayland） | `libx11`、`libxkbcommon` 等 X11 开发包 |
 
-**GUI 是唯一引入 CGO 的环节，且只影响 Linux 构建。** Linux GUI 包用 CI 容器构建，CLI 包仍保持零依赖交叉编译。
+**GUI 不做跨平台交叉编译。** cgo 图形栈的交叉编译代价极高，macOS 与 Windows 各自平台原生构建，Linux 用容器构建。这与 CLI 的「交叉编译出包」策略是两条独立流水线。
 
 ### 7.3 建议的发布流水线
 
 ```
 tag 触发
-  ├─ 矩阵构建 CLI/MCP：6 个目标（纯 Go，无容器）
-  └─ 矩阵构建 GUI：macOS/Windows 本机 + Linux 容器
+  ├─ 矩阵构建 CLI/MCP：6 个目标（纯 Go，无容器，交叉编译）
+  └─ 矩阵构建 GUI：macOS runner + Windows runner + Linux 容器（各自原生构建）
 ```
 
 ---
@@ -318,7 +317,9 @@ tag 触发
 | TUI 表格宽字符对齐 | 中文列名可能导致列错位 | 渲染时按显示宽度（runewidth）计算，非字节数或 rune 数 |
 | 驱动版本升级 | 行为变更 | 锁 `go.sum`，用 Renovate/Dependabot 控节奏 |
 | Oracle 驱动成熟度 | `sijms/go-ora` 特性覆盖不如商业驱动 | 列为「尽力而为」支持等级，不承诺完整 SQL 方言 |
-| Linux GUI 依赖 | 分发需要额外说明 | 优先提供 AppImage / deb，并写明 webkit2gtk 依赖 |
+| Gio 处于 0.x，API 频繁破坏性变更 | 升级时编译失败 | 全部 Gio 代码关在 `internal/ui/`，包外禁止 import `gioui.org`；CI 每周试升级 |
+| Gio 无 Table / Tree 组件 | GUI 核心工作量增加 | 基于 `layout.List` 自建；开发前先做技术验证（10 万行表格 + 中文输入 + IME 与虚拟滚动共存） |
+| 依赖不能锁版本 | 无法回移 bugfix | 锁 `go.mod` 版本但不锁 tag，CI 主动试升级而非被动等破坏 |
 
 ---
 
@@ -326,8 +327,9 @@ tag 触发
 
 以下尚未决策，需要在对应功能开工前确定：
 
-- **GUI 前端框架**：React / Vue / Svelte —— 取决于团队熟悉度
+- **GUI 技术验证结论**：10 万行虚拟化表格、中文输入法三平台实测、IME 与虚拟滚动共存 —— 这三项决定 Gio 路线是否成立，见 [`docs/gui-architecture.md`](gui-architecture.md) 第 8 节
 - **首批支持的引擎**：建议 Postgres + MySQL + SQLite 起步
 - **凭据存储的具体实现**：系统钥匙串各平台的 Go 库选型
 - **SQL 解析库**：`xwb1989/sqlparser` 已停止维护（最后提交 2018 年），需在 Vitess 系 fork、bytebase 解析器 或方言专用解析器之间选型
 - **是否支持本地文件型数据库直接打开**（如 `.duckdb`、`.sqlite3` 文件）—— 需确认是否引入 duckdb 的 cgo 依赖
+- **GUI 主题与字体策略**：深色为主还是双主题；内置字体（体积换一致性）还是系统字体（体积换通用性）

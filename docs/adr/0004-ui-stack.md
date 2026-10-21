@@ -1,23 +1,40 @@
-# ADR-0004：界面栈选型（Cobra + Bubble Tea v2 / Wails v2）
+# ADR-0004：界面栈选型（Gio 原生 GPU 渲染）
 
 - 状态：已采纳
 - 日期：2026-10-21
+- 修订：2026-10-21（同日修订，原决策见文末「决策沿革」）
 
 ## 背景
 
-需要同时确定 CLI 与 GUI 的界面技术栈。选型时核实了 2026-10-21 的实际版本状态。
+项目需要三种界面形态：交互式 CLI、GUI 桌面客户端、供 AI Agent 使用的 MCP Server。
+
+CLI 与 MCP 的选型不受影响（见 ADR-0003、ADR-0006）。GUI 的选型经历了两个阶段：
+
+第一阶段需求是「跨平台 GUI 客户端」，当时评估后选定 Wails v2 + Web 前端。随后需求明确为 **「Go + 原生平台 GPU 渲染」**，系统 WebView 路线出局，候选收敛到 Gio / Fyne / giu。
+
+数据库管理工具的界面需求画像（决定了权重）：
+
+| 需求 | 权重 | 说明 |
+|---|---|---|
+| 密集数据表格 | 决定性 | 万行级结果集、虚拟滚动、列排序/筛选/调整宽度 |
+| 树形导航 | 高 | 连接 → 库 → schema → 表 → 列 的多级懒加载 |
+| SQL 编辑器 | 高 | 语法高亮、多行编辑、中文注释 |
+| 中文输入法 | 高 | 中文表名、字段注释、中文查询条件 |
+| 自由分栏布局 | 中 | 表格/编辑器/侧栏可拖拽调整 |
+| 图表 | 低 | 结果分布可视化 |
 
 ## 决策
 
 **CLI**
 - 子命令框架：`spf13/cobra` v1.10.2
-- 交互界面：`charmbracelet/bubbletea` v2（v2.1.0，2026-10-08 转正）
+- 交互界面：`charmbracelet/bubbletea` v2（v2.1.0）
 - 样式：`charmbracelet/lipgloss` v2（v2.0.6）
 - 组件：`charmbracelet/bubbles` v2（v2.2.1）
 
 **GUI**
-- 框架：`wailsapp/wails` v2（v2.17.0）
-- 前端：Web 技术，框架待定
+- 框架：`gioui.org`（Gio）v0.10.3
+- 渲染后端：macOS **Metal**、Windows **D3D11**、Linux **Vulkan**（EGL 备用）
+- 自建组件：虚拟化数据表格、树形导航（基于 `layout.List`）
 
 **MCP**
 - SDK：`modelcontextprotocol/go-sdk` v1.8.0（官方）
@@ -26,36 +43,54 @@
 
 | 方案 | 版本状态 | 淘汰理由 |
 |---|---|---|
-| Wails v3 | v3.0.0-beta.34（2026-10-20） | 官方路线图自述「当前状态：Beta」，API 在 v3.0.0 前仍可能变更；Linux 默认改用 GTK4 + WebKitGTK 6.0，而 Ubuntu 22.04 / Debian 12 / Fedora ≤39 都没有，只能走将于 v3.1 移除的 `-tags gtk3` 旧路径 |
-| Fyne v2 | v2.8.2 | 需要 cgo + OpenGL，Linux 分发要打包一堆依赖；组件集对密集数据表格支持弱，要自己造大量轮子 |
-| Gio | v0.10.3 | 1.0 之前，API 不稳定 |
-| Bubble Tea v1 | v1.3.10（2025-09） | 已被 v2 取代 |
-| `mark3labs/mcp-go` | v1.3.0 | 社区实现，协议演进无官方保障 |
-| lxn/walk | 2021 年后停更 | 仅支持 Windows |
-| zserge/lorca | v0.1.10（2021） | 依赖用户已装 Chrome |
+| Wails v2 / v3 | v2.17.0 / v3.0.0-beta.34 | 系统 WebView 路线，不满足「原生平台 GPU 渲染」的需求 |
+| Fyne | v2.8.2 | 渲染后端只有 OpenGL，而 **Apple 已全面弃用 OpenGL**，macOS 上是给未来埋雷；因 `go-gl/glfw` 三平台全部需要 cgo；桌面 IME 长期不稳（v2.8.2 仍有 #618 输入法候选窗跑出应用外、#2777 中文输入被截断、#2418 不弹中文键盘三个 open issue） |
+| giu | v0.15.0 | Dear ImGui 绑定，cgo + 捆绑 ImGui C++，观感与目标不符，数据表格同样要自写，无相对 Gio 的优势 |
 
-> GUI 的完整方案（运行时形态、前端栈、构建与打包矩阵、平台细节）见 [`docs/gui-architecture.md`](../gui-architecture.md)。
+### 为什么是 Gio 而不是 Fyne
 
-## 理由
+1. **Metal / D3D11 / Vulkan 才是真正的原生 GPU 渲染**。Fyne 的 `internal/painter` 只有 `gl`（OpenGL）和 `software`（软件光栅回退）两个后端。Apple 已弃用 OpenGL，它在 Apple 平台仍可用但不再是推荐 API，风险随时间上升。
+2. **中文输入法质量差距明显**。Gio 的 `app/ime.go` 是完整的文本输入协议实现（preedit、commit、surrounding text、UTF-16 ↔ rune 索引转换），逐平台适配。Fyne 这条路径长期不稳 —— 一个面向中文用户的 SQL 编辑器不能接受。
+3. **cgo 依赖面更小**。Fyne 三平台全需 cgo；Gio 只有 darwin 与 Linux Wayland 需要，Windows 与 Linux X11 路径是纯 Go。
+4. **无头黄金图测试**。`unit` 包能把界面渲染成图做像素对比，UI 回归测试可在 CI 跑，不占开发者前台。
+5. **immediate mode 代码量小**，长期维护成本低。
 
-**Bubble Tea v2**：v2 在 2026-10 刚转正，Elm 架构适合做「表格式数据浏览」这种交互密集的场景（`bubbles` 自带 table、viewport、textarea 组件）。纯 Go，与 ADR-0002 的 `CGO_ENABLED=0` 约束一致。
+### 代价与缓解
 
-**Wails v2**：Go 后端 + 系统 WebView。数据表格、树形结构、图表渲染、中文输入法支持均无短板 —— 这正是 GUI 相对 TUI 的核心优势。v2 已稳定维护多年。
+| 代价 | 缓解 |
+|---|---|
+| Gio 无 Table / Tree 组件，需自建（表格 800–1500 行，树 300–500 行） | `layout.List` 是真虚拟化，底座现成；这部分工作量用 Fyne 也要做（通用 Table 不提供类型着色、NULL 样式、字节截断，最终仍要重写渲染层） |
+| **Gio 依赖不能锁版本**。官方明确「pre-1.0 tags 仅供参考，不指定有持续支持的版本，bugfix 不会回移」，0.x 阶段每次 minor 升级是破坏性变更 | 全部 Gio 代码关在 `internal/ui/` 一个包内，**包外禁止 import `gioui.org`**；CI 每周试一次升级；升级只影响一个包 |
 
-**官方 MCP SDK**：MCP 协议仍在演进，官方 Go SDK 保证协议跟进。
+## 前置验证
 
-## 关于 GUI 前端用 Web 技术的说明
+在正式开发前做 2–3 天技术验证（`spike/` 目录，不进主分支），只回答三个问题：
 
-Wails 只要求「后端是 Go」。界面层使用 Web 技术是桌面应用的主流做法，不代表项目不是 Go 项目：所有业务逻辑、驱动、协议处理全在 Go 侧，前端只负责渲染与交互，跨进程调用走 Wails 生成的类型安全绑定。
+1. 10 万行结果集的虚拟化表格是否流畅，横向滚动与列头是否同步
+2. macOS / Windows / Linux 实机上 SQL 编辑器的中文输入是否正常
+3. IME 预编辑串是否会被虚拟滚动打断
 
-如果坚持「整个项目都是 Go」到界面层，唯一的现实选项是 Fyne 或 Gio，代价是数据表格能力显著弱于 Web 前端 —— 对一个数据库管理软件来说这是致命的。
+第 2 项若在三平台有平台性问题，需要准备降级方案（GUI 仍用 Gio，中文输入引导为直接粘贴），或重新评估 Fyne。
 
 ## 后果
 
-- **TUI 与 GUI 是两套界面代码**，视觉与交互不共享。共享的只有 service 层。若未来要统一视觉，只能共享设计语言，不能共享组件代码
-- **TUI 的中文 IME 输入是弱项**。终端下输入法兼容性依赖具体终端软件。缓解：CLI 的高频输入场景是命令与标识符，中文以只读浏览为主；需要输入中文的正式场景引导到 GUI
-- **TUI 表格的中文列宽需按显示宽度计算**（`runewidth`），不能用字节数或 rune 数，否则列会错位
-- **Linux GUI 构建需要 CGO 与 `libwebkit2gtk`**，在 CI 容器中完成
-- **Wails v2 的 Linux 构建必须加 `-tags webkit2_41`**。Wails v2 默认链接 `libwebkit2gtk-4.0`，而 Ubuntu 24.04 等新发行版只提供 4.1。构建容器统一固定 Ubuntu 24.04 + `libwebkit2gtk-4.1-dev`，只维护 4.1 一条路径
-- **Wails v2 CLI 只内置 Windows 的 NSIS 安装包**。macOS 的 DMG 与 Linux 的 deb/AppImage 需要外部打包工具（GoReleaser v2.18.3 等）
-- **Windows 10 缺 WebView2**，需要靠 `-webview2` 策略处理（默认 `download` 引导安装，离线分发用 `embed`）
+- **TUI 与 GUI 是两套界面代码**，视觉与交互不共享，共享的只有 service 层
+- **TUI 的中文 IME 输入是弱项**，终端下输入法兼容性依赖具体终端软件。CLI 高频输入是命令与标识符，中文以只读浏览为主
+- **TUI 表格的中文列宽需按显示宽度计算**（`runewidth`），不能用字节数或 rune 数
+- **CGO 边界需要重新划线**（见 ADR-0002）：核心库/CLI/MCP 保持 `CGO_ENABLED=0`，GUI 轨道在 macOS 与 Linux Wayland 上需要 cgo
+- **Gio 依赖必须跟 `main`**，不能锁 tag。这是持续性的维护成本，不是一次性成本
+- **GUI 不做跨平台交叉编译**。macOS 与 Windows 各自平台原生构建，Linux 用容器构建。cgo 图形栈交叉编译代价极高
+
+---
+
+## 决策沿革
+
+### 原决策（2026-10-21 上午，已被取代）
+
+GUI 采用 `wailsapp/wails` v2 + Web 前端，理由是：数据表格、树形导航、SQL 编辑器、中文输入法在 Web 技术下全部是强项；系统 WebView 让产物体积控制在 10–20MB；Windows/macOS 构建纯 Go，Linux 需 webkit2gtk。
+
+### 变更原因
+
+需求随后明确为「**Go + 原生平台 GPU 渲染**」，并明确 GUI 也用 Go、不引入 Web 技术栈。系统 WebView 路线（无论 Wails 还是 Electron）不满足该要求，故整体重选。
+
+原决策中的其余判断仍然有效，保留在 ADR-0002 与 `docs/architecture.md` 中。

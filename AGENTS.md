@@ -4,25 +4,26 @@ SelaDB —— 跨平台（Windows / macOS / Linux）数据库管理软件。
 
 ## 技术栈（已定，勿随意更换）
 
-全项目 **Go**。GUI 前端用 Web 技术（Wails 打包成原生窗口），这是桌面应用主流做法，界面层例外，业务逻辑全在 Go 侧。
+全项目 **Go**。GUI 用 Gio 直接走平台原生 GPU 渲染（macOS Metal / Windows D3D11 / Linux Vulkan），不用 WebView。
 
 | 层 | 选型 |
 |---|---|
 | CLI 框架 | `spf13/cobra` |
 | CLI 交互界面 | `charmbracelet/bubbletea` v2 + `lipgloss` v2 + `bubbles` v2 |
-| GUI | `wailsapp/wails` v2（**不要用 v3，仍是 beta**） |
+| GUI | `gioui.org`（Gio，immediate mode） |
 | MCP | `modelcontextprotocol/go-sdk`（官方 SDK） |
 | 日志 | 标准库 `log/slog` |
 
-**完整选型、版本号、构建矩阵见 [`docs/architecture.md`](docs/architecture.md)。决策依据见 [`docs/adr/`](docs/adr/)。**
+**完整选型、版本号、构建矩阵见 [`docs/architecture.md`](docs/architecture.md) 与 [`docs/gui-architecture.md`](docs/gui-architecture.md)。决策依据见 [`docs/adr/`](docs/adr/)。**
 
 ## 硬约束
 
-1. **`CGO_ENABLED=0`**。核心库、CLI、MCP Server 只能用纯 Go 依赖，这样三平台交叉编译不需要 mingw-w64。唯一例外是 GUI 的 Linux 构建（需 `libwebkit2gtk`），且必须在 CI 容器里做。选纯 Go 替代品：`modernc.org/sqlite`（不用 `mattn/go-sqlite3`）、`sijms/go-ora/v2`（不用 `godror`）、`jackc/pgx/v5`（不用已归档的 `lib/pq`）。
+1. **核心库 / CLI / MCP Server 保持 `CGO_ENABLED=0`**。这样三平台交叉编译不需要 mingw-w64。GUI 轨道例外：macOS 与 Linux Wayland 需要 cgo（Gio 的平台胶水层），Windows 与 Linux X11 不需要。选纯 Go 替代品：`modernc.org/sqlite`（不用 `mattn/go-sqlite3`）、`sijms/go-ora/v2`（不用 `godror`）、`jackc/pgx/v5`（不用已归档的 `lib/pq`）。
 2. **单 `go.mod` 多 package**，不要拆多个 module。当前没有需要独立发版或隔离依赖的场景。
-3. **业务逻辑只写在 `internal/service/`**。CLI 命令、GUI 绑定、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不放业务判断。
+3. **业务逻辑只写在 `internal/service/`**。CLI 命令、GUI 界面、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不放业务判断。
 4. **驱动用小接口 + 类型断言**（见 `docs/adr/0005-driver-interfaces.md`）。不要为了省事定义大接口，Redis 实现不了 `ListColumns`。
 5. **CLI 所有命令必须支持 `--json`**。Skill 包装、MCP 工具、CI 脚本三条路径都依赖它。
+6. **`internal/ui/` 之外禁止 import `gioui.org`**。Gio 处于 0.x，官方不承诺回移 bugfix、每次 minor 升级都是破坏性变更。把 Gio 关在一个包里，升级时只改一处。
 
 ## 加新引擎时
 

@@ -28,7 +28,8 @@
 
 ## 后果
 
-- **GUI 的 Linux 构建需要 CGO**。Wails 在 Linux 上依赖 `libwebkit2gtk`，这是 GTK/WebKit 生态的固有要求，无法回避。缓解方式：Linux GUI 包在 CI 容器中构建，CLI 包保持零依赖交叉编译。macOS 与 Windows 的 GUI 构建不受影响。
+- **GUI 轨道需要 CGO，但范围已重新划定**（2026-10-21 修订）。GUI 最终选用 Gio（见 ADR-0004），其平台胶水层的 C 代码分布是：macOS 需要（`app/os_darwin.m` 引入 `_cgo_export.h`）、Linux Wayland 需要（`app/os_wayland.c`）、Windows 与 Linux X11 不需要。**核心库、CLI、MCP Server 仍严格保持 `CGO_ENABLED=0`**，本 ADR 针对的正是这一层 —— 它保护的是三平台交叉编译的顺畅度，与 GUI 框架选谁无关。
+- **GUI 不做跨平台交叉编译**。macOS 与 Windows 各自平台原生构建，Linux 用容器构建。cgo 图形栈的交叉编译代价极高。
 - **部分引擎特性覆盖可能弱于 cgo 驱动**。例如 Oracle 的 `sijms/go-ora` 对复杂类型和 PL/SQL 的支持不如 `godror` 完整。应对：把 Oracle 列为「尽力而为」支持等级，不承诺完整 SQL 方言。
 - **SQLite 需在两个纯 Go 实现间取舍**。`modernc.org/sqlite` 是 C 转 Go 的完整实现，兼容性最好；`ncruces/go-sqlite3` 基于 WASM，编译更快、二进制更小但特性少一些。默认选 `modernc.org/sqlite`。
 - **未来的本地文件型数据库支持可能破例**。例如直接打开 `.duckdb` 文件需要 duckdb 的 cgo 绑定。届时需单独开 ADR 说明。
