@@ -4,6 +4,8 @@
 > 关联：ADR-0004（界面栈选型）、ADR-0002（保持 CGO_ENABLED=0）
 >
 > **本文档取代了初版基于 Wails 的方案。** 需求确认为「Go + 原生平台 GPU 渲染」，因此系统 WebView 路线出局，候选收敛到 Gio / Fyne / giu。
+>
+> Go 与 Rust 两个生态的完整方案对比见 [`gui-framework-survey.md`](gui-framework-survey.md)。
 
 本文聚焦 GUI 客户端。核心库、CLI、MCP Server 的选型见 [`architecture.md`](architecture.md)。
 
@@ -337,6 +339,8 @@ img := golden.Image()
 ---
 
 ## 8. 前置技术验证（建议先做）
+
+验证项与判定标准见 [`gui-framework-survey.md`](gui-framework-survey.md) 第 5 节。Gio / Ebiten / Slint 三个方案共用同一套测试数据与断言，便于横向对比。
 
 在正式投入 GUI 开发前，先做一个 2–3 天的 spike，只回答三个问题：
 
