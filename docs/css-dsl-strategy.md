@@ -93,7 +93,20 @@
 
 ---
 
-## 6. 建议
+## 6. 语言选型：Rust
+
+详细的 crate 级对比见 [`zig-vs-rust.md`](zig-vs-rust.md)。要点：
+
+Rust 侧现成件覆盖了自研方案里最贵的部分 —— `taffy`（CSS Flexbox + Grid 规范实现）、
+`wgpu`（Metal/DX12/Vulkan）、`winit`（Cocoa/Win32/Wayland）、`cosmic-text`（整形+换行）、
+`cssparser` + `bao-stylo`（Firefox 的 CSS 解析与级联）。
+
+Zig 侧这三块（GPU 抽象、窗口、CSS 级联）恰是生态最空白处，只能 FFI C 库或自己写。
+且 Zig 自身 pre-1.0，框架代码会跟着 breaking change 反复重写。
+
+---
+
+## 7. 建议
 
 **除非你打算把 GUI 框架本身当产品**（像 Zed 那样），否则自研是负期望值。
 
