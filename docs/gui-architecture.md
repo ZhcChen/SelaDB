@@ -127,6 +127,67 @@ Gio 的 README 明确写着：
 
 giu 是 Dear ImGui 的 Go 绑定：cgo + 捆绑 ImGui C++ 库。外观是 ImGui 风格（对终端用户是加分，对「现代桌面应用」是减分），数据表格组件同样要自写。相比 Gio 没有优势，相比 Fyne 的组件更弱。多一个候选不改变结论。
 
+### 2.6 代码级评估（读源码后的发现）
+
+以下结论来自直接阅读 Gio v0.10.3、go-text/typesetting 与 gio-x 的源码，不是文档摘抄。
+
+#### 代码质量：高于预期
+
+核心里已经处理了成熟框架才会关心的细节：
+
+| 能力 | 实现位置 | 说明 |
+|---|---|---|
+| GPU 设备丢失恢复 | `app/window.go` → `gpu.ErrDeviceLost` | 驱动重置、显卡切换、驱动更新后重建上下文并重试，不是直接退出 |
+| 无障碍语义树 | `app.SemanticRoot` / `LookupSemantic` / `AppendSemanticDiffs` | 屏幕阅读器可读，很多 Go GUI 库完全没有 |
+| 焦点管理 | `moveFocus` / `RevealFocus` / `ScrollFocus` | 方向键移动焦点、滚动到可见区域 |
+| IME 状态机 | `app/callbacks` → `SetComposingRegion` / `EditorInsert` / `EditorReplace` / `SetEditorSelection` / `SetEditorSnippet` | 完整的文本输入协议 |
+| 文本整形 | `text` → go-text/typesetting | HarfBuzz 整形 + CSS 换行规则 + bidi + 字形覆盖率 |
+
+注释密度高、文档规范，没有「看起来像 Go 但其实是 C 翻译」的痕迹。
+
+#### 维护状态：健康
+
+最近提交 2026-10-14（距今 7 天），仓库 `pushed_at` 2026-10-15。贡献者除主维护者 Elias Naur 外还有 Chris Waldon、qiannian、Martin Lange、Tobias Gesellchen、astaroth、aarzilli 等。
+
+commit message 质量很高，例如 #714（Windows D3D11 设备丢失）明确写出根因 —— "DXGI usually reports a removed or reset device from Present, after a driver reset (TDR), driver update, or GPU switch" —— 并给出复现路径。这类修复是真实生产环境打磨出来的。
+
+#### 中文可用性：比预期好得多
+
+`text` 包**默认加载系统字体**（`text.NoSystemFonts()` 才是用来关闭它的），底层是 go-text/typesetting 的 `fontscan`：
+
+- **纯 Go 跨平台字体发现**。`fontscan/readme.md` 写明字体目录来自 `DefaultFontDirectories()`，目录列表抄自 fontconfig 与 go-findfont。Linux 上不需要 fontconfig 这个 C 库，Windows 上不需要 DirectWrite 绑定
+- **字形覆盖率查询**（`fontscan/rune_coverage.go`）—— 主字体缺字时能正确回退到含该字形的字体
+- **CSS 风格的样式匹配** + fontconfig 风格的家族替换规则（`substitutions_table.go`）
+
+因此 macOS 会取到苹方、Windows 取到微软雅黑、Linux 取到 Noto Sans CJK，**不需要打包中文字体**。这是相对 Fyne 的一个实打实的优势。
+
+代价：首次启动要做一次字体索引扫描，约 0.2–0.5 秒，之后走磁盘缓存快速加载。对「轻快」定位是一次性的首启延迟，需要在首次启动体验上做处理（比如先显示窗口再加载）。
+
+#### 明确的短板
+
+| 短板 | 事实 |
+|---|---|
+| **无 Table / Tree** | `widget` 包 31 个文件里没有表格和树 |
+| **material 组件偏少** | 只有 16 个文件：button、checkable、checkbox、decorations、editor、label、list、loader、progressbar、progresscircle、radiobutton、slider、switch、theme。没有 tree / table / tabs / menu / dialog / dropdown |
+| **Issue tracker 不在 GitHub** | 仓库 `has_issues: false`，问题走 todo.sr.ht 邮件列表。团队协作与社区反馈可见度都差，搜 GitHub Issues 也搜不到 |
+| **示例仓库 8 个月未更新** | `gioui/gio-example` 最后 push 2026-02-18，学习资料可能滞后于 API 变化 |
+| **生态薄** | gio-x（扩展）66 stars，gio-cmd 19 stars。第三方组件基本没有 |
+| **依赖不能锁版本** | 见 2.4 |
+
+另外需要知道的一点：**Gio 和 Fyne 是同一个作者**（Elias Naur）。选 Gio 不是换了个维护者，而是同一个人的两条技术路线。两边目前都在活跃维护，但如果他转向某一边，另一边的活跃度会受影响 —— 这是单点维护者的固有风险，两个方案都躲不掉。
+
+#### 判断
+
+**值得用，但价值不在「省事」，在「能力上限」。**
+
+- 若目标是「快速做一个能用的桌面 GUI」→ Fyne 更省事，Table 与 Tree 现成
+- 若目标是「在 macOS 上做一个不落后于原生应用的东西」→ 只有 Gio 能做到，因为 Apple 弃用了 OpenGL
+- 若目标是「中文输入可靠」→ Gio 明显更好，且不需要打包中文字体
+
+对 SelaDB 而言，需要自建的三个组件（表格、树、编辑器高亮）恰好是产品的核心竞争力所在。Fyne 的通用 Table 最终也要重写渲染层才能做类型着色、NULL 样式、BLOB 截断、DDL 预览这些数据库特有表达。
+
+也就是说：**自建成本在两个方案里是相近的**，Gio 多给你 Metal、靠谱的 IME 和无头测试能力，Fyne 少给你这些、但多给你约 300–500 行的表格骨架代码。
+
 ---
 
 ## 3. 架构约束的变化
@@ -292,6 +353,7 @@ img := golden.Image()
 ## 9. 待定项
 
 - **主题**：深色为主，还是深浅双主题
-- **字体**：内置字体（体积换一致性）还是用系统字体（体积换通用性）
+- **字体**：**已明确用系统字体**（见 2.6），不需要内置中文字体。仍待定的是是否额外内置一套西文/等宽字体以保证跨平台视觉一致
+- **首启字体扫描延迟**：首次启动 0.2–0.5 秒的字体索引扫描，需要设计加载流程避免白屏
 - **图表**：结果分布可视化是否做，用什么方案
 - **首批引擎**：建议 Postgres + MySQL + SQLite，与 GUI 表格组件同步推进
