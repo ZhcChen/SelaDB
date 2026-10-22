@@ -123,7 +123,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  padding: var(--sp-6);
+  padding: var(--sp-5);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--r-xl);
@@ -135,8 +135,7 @@
 
 .entry__card:hover {
   border-color: var(--accent-border);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  background: var(--bg-hover);
 }
 
 .entry__card-title {
@@ -523,7 +522,8 @@
 .doc__id {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  color: var(--type-uuid);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-default);
 }
 
 .doc__actions {
@@ -532,10 +532,13 @@
   gap: var(--sp-2);
 }
 
+/* 头部操作改成 16px 的图标按钮组 */
 .doc__action {
+  width: 20px;
   height: 20px;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-xs);
+  display: grid;
+  place-items: center;
+  padding: 0;
   color: var(--fg-muted);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
@@ -546,6 +549,14 @@
   background: var(--bg-hover);
   color: var(--fg-default);
   border-color: var(--border-default);
+}
+
+.doc__action-chevron {
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.doc__action-chevron.is-open {
+  transform: rotate(90deg);
 }
 
 .doc-tree__body {
@@ -646,3 +657,151 @@
  * Redis 的键列表形态上仍是行式表格,直接复用 DataGrid;
  * 这里只保留一个说明块的位置,给将来的「按类型分组」视图用。
  * -------------------------------------------------------------------------- */
+
+/* 入口页的引擎徽标条 */
+.entry__engines {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.entry__engines-label {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  letter-spacing: var(--tracking-wide);
+}
+
+/* -----------------------------------------------------------------------------
+ * 快速开始面板
+ *
+ * 空工作区不是「没有内容」,是「还没开始」。桌面工具在这里给下一步动作,
+ * 而不是两行居中的提示文字。
+ * -------------------------------------------------------------------------- */
+.start {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-9) var(--sp-6);
+}
+
+/* 宽度要写死 —— 放在 grid 容器里时 width:100% 参照的是 auto 列的宽度,
+   结果被算成内容的 max-content,卡片会被挤成一列 */
+.start__inner {
+  width: 640px;
+  max-width: 100%;
+}
+
+.start__title {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-4);
+}
+
+.start__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-3);
+}
+
+.start__card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.start__card:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-hover);
+}
+
+.start__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.start__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.start__card-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--fg-default);
+}
+
+.start__card-desc {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+
+.start__kbd {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--fg-subtle);
+}
+
+.start__recent {
+  margin-top: var(--sp-7);
+}
+
+.start__recent-title {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  margin-bottom: var(--sp-3);
+}
+
+.start__recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.start__recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  text-align: left;
+  font-size: var(--fs-sm);
+  color: var(--fg-default);
+}
+
+.start__recent-item:hover {
+  background: var(--bg-hover);
+}
+
+.start__recent-name {
+  font-family: var(--font-mono);
+  color: var(--fg-default);
+}

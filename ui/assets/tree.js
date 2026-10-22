@@ -118,7 +118,11 @@ class TreeView {
 
     const iconWrap = document.createElement("span");
     iconWrap.className = "tree__icon";
-    if (data.kind === "connection") iconWrap.classList.add("tree__icon--connection");
+    if (data.kind === "connection") {
+      iconWrap.classList.add("tree__icon--connection");
+      // 引擎品牌色从节点上取,树里混着多个引擎时靠颜色就能分辨
+      if (engineId) iconWrap.style.setProperty("--engine-color", `var(--engine-${engineId})`);
+    }
     // 连接节点用统一的插头图标,引擎靠左侧色条区分;
     // mock 数据里的 icon 字段是引擎 id,不是图标名。
     const iconName = data.kind === "connection" ? "connection" : data.icon ?? iconForKind(data.kind);

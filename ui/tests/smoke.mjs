@@ -212,7 +212,7 @@ await page.waitForTimeout(150);
 const afterToggle = await page.locator(".doc-node__children.is-open").count();
 check("点击箭头可以折叠分支", afterToggle !== beforeToggle, `${beforeToggle} → ${afterToggle}`);
 
-await page.locator(".doc__action", { hasText: "展开全部" }).first().click();
+await page.locator('.doc__action[title="展开全部"]').first().click();
 await page.waitForTimeout(150);
 const afterExpandAll = await page.locator(".doc-node__children.is-open").count();
 check("展开全部生效", afterExpandAll >= afterToggle, `${afterToggle} → ${afterExpandAll}`);
@@ -230,7 +230,7 @@ await shot(page, "03-nosql");
 // ---- 查询编辑器 ----
 console.log("\n[6] 查询编辑器");
 await page.locator(".tree__search input").fill("");
-await page.locator("button", { hasText: "打开查询" }).first().click();
+await page.locator('button[title*="打开查询"]').first().click();
 await page.waitForSelector(".query__input", { timeout: 5000 });
 check("查询编辑器已打开", (await page.locator(".query__input").count()) === 1);
 

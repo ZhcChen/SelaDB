@@ -123,6 +123,28 @@ function buildStructTable(headers, body) {
   return table;
 }
 
+/** SQL 类型归类,用来给类型列上色。 */
+function typeKind(type) {
+  const text = String(type ?? "").toLowerCase();
+  if (/int|serial|bigint|smallint/.test(text)) return "num";
+  if (/numeric|decimal|real|double|float|money/.test(text)) return "num";
+  if (/bool/.test(text)) return "bool";
+  if (/timestamp|datetime|date|time/.test(text)) return "time";
+  if (/uuid/.test(text)) return "uuid";
+  if (/json/.test(text)) return "json";
+  if (/bytea|blob|binary/.test(text)) return "binary";
+  return "text";
+}
+
+/** 默认值的形态:数字、字符串、函数调用。 */
+function defaultKind(value) {
+  if (typeof value === "number") return "num";
+  const text = String(value);
+  if (/^'.*'$/.test(text)) return "str";
+  if (/^[a-z_]+\(.*\)$/i.test(text)) return "func";
+  return "text";
+}
+
 /**
  * 数 DDL 里有几条语句。
  *
@@ -479,16 +501,37 @@ class StructureView {
 
       tr.appendChild(cell(String(positionOf(column, index))));
 
+      // 键标记放在列名左边 —— 放在最右侧的独立一列,视线要横跨整行才找得到
       const nameCell = document.createElement("td");
-      nameCell.className = "mono";
-      nameCell.textContent = column?.name ?? "";
+      nameCell.className = "struct-namecell";
+      if (column?.pk) {
+        const badge = document.createElement("span");
+        badge.className = "struct-key struct-key--pk";
+        badge.textContent = "PK";
+        nameCell.appendChild(badge);
+      } else if (foreignKeyColumns.has(column?.name)) {
+        const badge = document.createElement("span");
+        badge.className = "struct-key struct-key--fk";
+        badge.textContent = "FK";
+        nameCell.appendChild(badge);
+      }
+      const nameText = document.createElement("span");
+      nameText.className = "mono";
+      nameText.textContent = column?.name ?? "";
+      nameCell.appendChild(nameText);
       // 列注释放进 title,表格不因此多一列
       if (column?.comment) nameCell.title = column.comment;
       tr.appendChild(nameCell);
 
-      tr.appendChild(cell(column?.type ?? "", "mono"));
+      // 类型按类别着色,扫一眼就知道这一列是什么
+      const typeCell = document.createElement("td");
+      typeCell.className = `mono struct-type struct-type--${typeKind(column?.type)}`;
+      typeCell.textContent = column?.type ?? "";
+      tr.appendChild(typeCell);
+
       tr.appendChild(cell(column?.nullable === false ? "否" : "是"));
 
+      // 默认值区分「没有默认值」与「默认值是 NULL」
       const defaultCell = document.createElement("td");
       if (column?.default === null || column?.default === undefined) {
         const none = document.createElement("span");
@@ -496,25 +539,15 @@ class StructureView {
         none.textContent = "NULL";
         defaultCell.appendChild(none);
       } else {
-        defaultCell.className = "mono";
+        defaultCell.className = `mono struct-default struct-default--${defaultKind(column.default)}`;
         defaultCell.textContent = String(column.default);
       }
       tr.appendChild(defaultCell);
 
-      const keyCell = document.createElement("td");
-      if (column?.pk) {
-        keyCell.className = "struct-key struct-key--pk";
-        keyCell.textContent = "PK";
-      } else if (foreignKeyColumns.has(column?.name)) {
-        keyCell.className = "struct-key struct-key--fk";
-        keyCell.textContent = "FK";
-      }
-      tr.appendChild(keyCell);
-
       body.appendChild(tr);
     });
 
-    return buildStructTable(["位置", "列名", "类型", "可空", "默认值", "键"], body);
+    return buildStructTable(["位置", "列名", "类型", "可空", "默认值"], body);
   }
 
   /** 索引:名称 / 列 / 唯一 / 方法 / 主键 */
@@ -629,6 +662,20 @@ class StructureView {
     head.appendChild(copyButton);
     box.appendChild(head);
 
+    // 行号槽 + 代码区。代码编辑器该有行号,不然定位一个报错得自己数行。
+    const wrap = document.createElement("div");
+    wrap.className = "struct-ddl__codewrap";
+
+    const gutter = document.createElement("div");
+    gutter.className = "struct-ddl__gutter";
+    const lineCount = this.ddl.split("\n").length;
+    for (let line = 1; line <= lineCount; line += 1) {
+      const number = document.createElement("div");
+      number.className = "struct-ddl__lineno";
+      number.textContent = String(line);
+      gutter.appendChild(number);
+    }
+
     const codeBox = document.createElement("div");
     codeBox.className = "struct-ddl__code";
     const pre = document.createElement("pre");
@@ -637,7 +684,9 @@ class StructureView {
     code.innerHTML = highlightSql(this.ddl);
     pre.appendChild(code);
     codeBox.appendChild(pre);
-    box.appendChild(codeBox);
+
+    wrap.append(gutter, codeBox);
+    box.appendChild(wrap);
 
     return box;
   }

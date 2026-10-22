@@ -67,6 +67,23 @@ bun run test:smoke
 
 要对着 dev server 跑时用 `SELA_DB_UI_URL=http://127.0.0.1:8030 bun run test:smoke`。
 
+### 视觉评审
+
+冒烟验收验的是「功能对不对」,验不了「好不好看」。`tests/review.mjs` 把黄金截图
+交给多模态模型,按固定 rubric 打分,输出可定位的问题清单。
+
+```bash
+cd ui && node tests/review.mjs          # 全部截图
+cd ui && node tests/review.mjs 02-grid  # 只评某几张
+```
+
+报告落在 `tests/review-report.md`。三条维度是「布局与信息密度 / 对比度与类型
+可辨识 / 专业观感」,思路借自 [wandb/openui](https://github.com/wandb/openui)
+的 `backend/openui/eval/evaluate.py`,但 rubric 改写成了适配桌面数据库工具的版本。
+
+借的是它的 eval 思路,不是它的产物 —— openui 生成的是 Tailwind + shadcn 代码,
+直接拿来会同时违反「零第三方 UI 依赖」「零构建步骤」「tokens.css 唯一真源」。
+
 ## 设计决策
 
 2026-10-22 评审拍板,五条:

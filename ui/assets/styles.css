@@ -100,7 +100,7 @@ button {
  * -------------------------------------------------------------------------- */
 .app {
   display: grid;
-  grid-template-rows: var(--h-titlebar) var(--h-toolbar) 1fr var(--h-statusbar);
+  grid-template-rows: var(--h-topbar) 1fr var(--h-statusbar);
   height: 100vh;
   overflow: hidden;
 }
@@ -112,117 +112,136 @@ button {
 }
 
 /* -----------------------------------------------------------------------------
- * 2. 标题栏
+ * 2. 顶栏
+ *
+ * 原来标题栏与工具栏是上下两行:第二行只放四五个操作,横向空得发慌,却实打实
+ * 占了 40px 纵向空间。合并成一行后,把纵向空间还给数据网格。
  * -------------------------------------------------------------------------- */
-.titlebar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  padding: 0 var(--sp-4);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
-  -webkit-app-region: drag;
-}
-
-.titlebar > * {
-  -webkit-app-region: no-drag;
-}
-
-.titlebar__brand {
+.topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-md);
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-default);
+  height: var(--h-topbar);
+  padding: 0 var(--sp-3);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
 }
 
-.titlebar__logo {
-  width: 18px;
-  height: 18px;
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-right: var(--sp-2);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-base);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-default);
+  flex: none;
+}
+
+.topbar__logo {
+  width: 16px;
+  height: 16px;
   border-radius: var(--r-sm);
   background: linear-gradient(135deg, var(--accent), var(--engine-mongodb));
   flex: none;
 }
 
-.titlebar__spacer {
+.topbar__sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-default);
+  flex: none;
+}
+
+.topbar__group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.topbar__spacer {
   flex: 1;
+  min-width: var(--sp-4);
 }
 
-.titlebar__search {
+/* 顶栏里的操作按钮走 Ghost 样式:桌面工具的操作条不该是一排带描边的网页按钮 */
+.btn--tool {
+  height: 26px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--r-sm);
+}
+
+.btn--tool:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+  border-color: transparent;
+}
+
+.btn--tool:active {
+  background: var(--bg-active);
+}
+
+.btn--tool[disabled] {
+  color: var(--fg-disabled);
+}
+
+/* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框 */
+.topbar__search {
   position: relative;
-  width: 260px;
+  width: 220px;
+  flex: none;
 }
 
-.titlebar__search input {
+.topbar__search input {
   width: 100%;
   height: 26px;
   padding: 0 var(--sp-6) 0 var(--sp-4);
   font-size: var(--fs-sm);
   background: var(--bg-inset);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
   color: var(--fg-default);
 }
 
-.titlebar__search input::placeholder {
+.topbar__search input::placeholder {
   color: var(--fg-subtle);
 }
 
-.titlebar__search input:focus {
+.topbar__search:hover input {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+.topbar__search input:focus {
   outline: none;
   background: var(--bg-surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.titlebar__search-hint {
+.topbar__search-hint {
   position: absolute;
   right: var(--sp-2);
   top: 50%;
   transform: translateY(-50%);
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
   pointer-events: none;
 }
 
-/* -----------------------------------------------------------------------------
- * 3. 工具栏
- *
- * 分区布局:左区放数据级操作,右区放连接级操作与事务状态。
- * -------------------------------------------------------------------------- */
-.toolbar {
+/* 顶栏右侧的图标按钮 */
+.topbar__icons {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
-  padding: 0 var(--sp-4);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
-}
-
-.toolbar__group {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-
-.toolbar__divider {
-  width: 1px;
-  height: 18px;
-  background: var(--border-subtle);
+  gap: 1px;
   flex: none;
-}
-
-.toolbar__spacer {
-  flex: 1;
-}
-
-.toolbar__label {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-  white-space: nowrap;
 }
 
 /* -----------------------------------------------------------------------------
@@ -320,13 +339,13 @@ button {
 }
 
 .tree__search {
-  padding: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .tree__search input {
   width: 100%;
-  height: 26px;
+  height: 24px;
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
   background: var(--bg-inset);
@@ -352,7 +371,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  height: var(--row-h-sm);
+  height: var(--row-h-tree);
   padding-right: var(--sp-3);
   color: var(--fg-default);
   font-size: var(--fs-sm);
@@ -380,7 +399,8 @@ button {
   flex: none;
   display: grid;
   place-items: center;
-  color: var(--fg-subtle);
+  /* 折叠箭头是导航的主要抓手,太淡会看不清父子层级 */
+  color: var(--fg-muted);
   font-size: 9px;
   transition: transform var(--dur-fast) var(--ease-out);
 }
@@ -402,8 +422,9 @@ button {
   color: var(--fg-muted);
 }
 
+/* 连接节点的图标用引擎品牌色 —— 树里同时挂着几个引擎时,颜色比图标本身更快认出来 */
 .tree__icon--connection {
-  color: var(--fg-default);
+  color: var(--engine-color, var(--fg-default));
 }
 
 .tree__label {
@@ -414,12 +435,19 @@ button {
   white-space: nowrap;
 }
 
+/* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到 */
 .tree__count {
   flex: none;
+  padding: 0 var(--sp-2);
+  height: 16px;
+  display: grid;
+  place-items: center;
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-variant-numeric: tabular-nums;
+  background: var(--bg-inset);
+  border-radius: var(--r-xs);
 }
 
 .tree__children {
@@ -849,7 +877,8 @@ button {
 .grid__col-type {
   font-size: var(--fs-xs);
   font-weight: var(--fw-normal);
-  color: var(--fg-subtle);
+  /* 类型注解是结构元数据,要读得清 —— 用 muted 而不是 subtle */
+  color: var(--fg-muted);
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -908,9 +937,15 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* 布尔要有语义对立:true 是绿的,false 是灰的。
+   同一套绿色只能表示「真」,false 若也是绿的,扫一眼分不出真假。 */
 .grid__cell--bool {
   color: var(--type-bool);
   font-family: var(--font-mono);
+}
+
+.grid__cell--bool-false {
+  color: var(--type-bool-false);
 }
 
 .grid__cell--time {
@@ -1015,7 +1050,7 @@ button {
   width: 7px;
   height: 7px;
   border-radius: var(--r-full);
-  background: var(--fg-subtle);
+  background: var(--fg-muted);
   flex: none;
 }
 
@@ -1169,6 +1204,7 @@ button {
   font-size: var(--fs-sm);
   max-width: 320px;
   line-height: var(--lh-loose);
+  color: var(--fg-muted);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1496,7 +1532,7 @@ button {
   align-items: center;
   gap: var(--sp-4);
   width: 100%;
-  padding: var(--sp-3) var(--sp-5);
+  padding: var(--sp-2) var(--sp-5);
   text-align: left;
   color: var(--fg-default);
 }
@@ -2341,4 +2377,239 @@ button {
 
 .struct-ddl__spacer {
   flex: 1;
+}
+
+/* -----------------------------------------------------------------------------
+ * 18. 过滤条的内联形态
+ *
+ * 过滤条默认独占一行,挂在面板头时用 inline 形态 —— 网格上方能省一整行。
+ * -------------------------------------------------------------------------- */
+.grid__filter-slot {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.grid__filter--inline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.grid__filter--inline .grid__filter-input {
+  flex: none;
+  width: 220px;
+  height: 24px;
+}
+
+/* -----------------------------------------------------------------------------
+ * 19. 语义徽章与弱化值
+ *
+ * Redis 的键类型用小徽章区分;TTL 的 -1 显示成 ∞,读起来才不像出错了。
+ * -------------------------------------------------------------------------- */
+/* 徽章是单元格里的子元素,有自己的高度与内边距 */
+.grid__badge {
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  border-radius: var(--r-xs);
+  border: 1px solid transparent;
+}
+
+.grid__badge--string {
+  color: #15803d;
+  background: var(--success-soft);
+  border-color: var(--success-border);
+}
+
+.grid__badge--hash {
+  color: #1f6feb;
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+
+.grid__badge--list {
+  color: #c2410c;
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+}
+
+.grid__badge--set {
+  color: #8250df;
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+}
+
+.grid__badge--zset {
+  color: #be185d;
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+body[data-theme="dark"] .grid__badge--string {
+  color: #4ade80;
+}
+
+body[data-theme="dark"] .grid__badge--hash {
+  color: #79b8ff;
+}
+
+body[data-theme="dark"] .grid__badge--list {
+  color: #ffa657;
+}
+
+body[data-theme="dark"] .grid__badge--set {
+  color: #d2a8ff;
+}
+
+body[data-theme="dark"] .grid__badge--zset {
+  color: #f9a8d4;
+}
+
+/* 弱化但可读的值 —— ∞ 这类 */
+.grid__cell--falsy {
+  color: var(--fg-muted);
+}
+
+/* -----------------------------------------------------------------------------
+ * 20. 命令面板的快捷键提示栏
+ * -------------------------------------------------------------------------- */
+.palette__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  height: 28px;
+  padding: 0 var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+  flex: none;
+}
+
+.palette__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+
+.palette__kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-xs);
+}
+
+/* -----------------------------------------------------------------------------
+ * 21. DDL 预览的行号槽
+ *
+ * 网格布局 + 行号列 sticky:横向滚动时行号留在左侧,纵向滚动时跟着代码走。
+ * -------------------------------------------------------------------------- */
+.struct-ddl__codewrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 42px max-content;
+  align-content: start;
+  background: var(--bg-surface);
+}
+
+.struct-ddl__gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: var(--code-pad-y) var(--sp-3);
+  background: var(--bg-inset);
+  border-right: 1px solid var(--border-subtle);
+  text-align: right;
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-code);
+  color: var(--fg-subtle);
+  user-select: none;
+}
+
+.struct-ddl__code {
+  padding: var(--code-pad-y) var(--code-pad-x);
+  font-family: var(--font-code);
+  font-size: var(--fs-code);
+  line-height: var(--lh-code);
+  white-space: pre;
+  color: var(--syntax-ident);
+}
+
+.struct-ddl__code pre {
+  margin: 0;
+}
+
+/* -----------------------------------------------------------------------------
+ * 22. 结构视图的列名、类型与默认值
+ * -------------------------------------------------------------------------- */
+.struct-namecell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+
+.struct-key--fk {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 var(--sp-2);
+  margin-left: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--info);
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  border-radius: var(--r-xs);
+  vertical-align: middle;
+}
+
+.struct-type--num {
+  color: var(--type-int);
+}
+
+.struct-type--bool {
+  color: var(--type-bool);
+}
+
+.struct-type--time {
+  color: var(--type-time);
+}
+
+.struct-type--uuid {
+  color: var(--type-uuid);
+}
+
+.struct-type--json {
+  color: var(--type-json);
+}
+
+.struct-type--binary {
+  color: var(--type-binary);
+}
+
+.struct-default--num {
+  color: var(--type-int);
+}
+
+.struct-default--str {
+  color: var(--success);
+}
+
+.struct-default--func {
+  color: var(--syntax-function);
 }

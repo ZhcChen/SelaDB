@@ -52,6 +52,7 @@ docs/                   架构文档与 ADR
 - 因为不用 ES module（`file://` 下会被 CORS 拦住），所有脚本共享全局作用域，**`ui/assets/` 里的顶层名字必须全局唯一**。
 - `tokens.css` 是唯一设计源，组件样式里不出现裸色值与裸尺寸。
 - 改动设计源后跑 `cd ui && bun run test:smoke`（直接跑 `file://` 协议，不需要先起服务器），截图落在 `ui/tests/screenshots/` 作为视觉回归基准。
+- **改了视觉还要过视觉评审**：`cd ui && node tests/review.mjs` 会把黄金截图交给多模态模型按固定 rubric 打分，输出可定位的问题清单，报告落在 `ui/tests/review-report.md`。功能断言验不了「好不好看」，这一步不能省。
 - 详见 [`ui/README.md`](ui/README.md) 与 [`docs/ui-design-plan.md`](docs/ui-design-plan.md)。
 
 ## 加新引擎时

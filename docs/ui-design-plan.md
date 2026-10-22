@@ -262,7 +262,35 @@ interface DataView {
 | **V0.5** | NoSQL 差异化视图(Mongo 文档树 / Redis 键值) | `DataView` 接口是否站得住 | 已完成 |
 | **V0.6** | 表结构视图 + DDL 预览 + 弹层与表单控件 | 驱动的元数据能力与破坏性操作 | 已完成 |
 
-实现现状见 `ui/` 模块;验收命令 `cd ui && bun run test:smoke`(45 项断言)。
+实现现状见 `ui/` 模块;验收命令 `cd ui && bun run test:smoke`(62 项断言)。
+
+### 视觉评审
+
+功能断言验不了「好不好看」。`ui/tests/review.mjs` 把黄金截图交给多模态模型,
+按固定 rubric 打分,输出可定位的问题清单。
+
+思路借自 [wandb/openui](https://github.com/wandb/openui) 的
+`backend/openui/eval/evaluate.py` —— 它用 GPT-4-vision 给生成的 UI 按三条
+1–5 分:媒体质量 / 对比度 / 相关性。这里把三条改写成适配桌面数据工具的版本:
+
+| 维度 | openui 原版 | SelaDB 版 |
+|---|---|---|
+| Media Quality | 桌面与移动端渲染 | **布局与信息密度** —— 专业工具的紧凑与层级,不是响应式 |
+| Contrast | 明暗模式表现 | **对比度与类型可辨识** —— 类型色板彼此分不分得开 |
+| Relevance | 是否满足需求 | **专业观感** —— 像商业数据库工具还是通用后台模板 |
+
+命令:
+
+```bash
+cd ui && node tests/review.mjs              # 全部截图
+cd ui && node tests/review.mjs 02-grid      # 只评某几张
+```
+
+报告落在 `ui/tests/review-report.md`。
+
+**借的是它的 eval 思路,不是它的产物。** openui 生成的是 Tailwind + shadcn 的
+React 代码,直接拿来会同时违反「零第三方 UI 依赖」「零构建步骤」「tokens.css
+唯一真源」三条约束,而且审美会变成通用 shadcn 味。
 
 三条需要 Rust 实现侧对齐的约定:
 

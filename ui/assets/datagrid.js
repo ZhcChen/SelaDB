@@ -209,9 +209,11 @@ class DataGrid {
     root.className = "grid";
     this.root = root;
 
-    // 过滤条
+    // 过滤条。默认独占一行;传了 filterMount 就挂到那儿去(面板头),
+    // 网格上方能省下一整行的纵向空间。
     const filterbar = document.createElement("div");
-    filterbar.className = "grid__filterbar";
+    const filterMount = this.config.filterMount;
+    filterbar.className = filterMount ? "grid__filter grid__filter--inline" : "grid__filterbar";
     const input = document.createElement("input");
     input.className = "grid__filter-input";
     input.type = "text";
@@ -224,7 +226,7 @@ class DataGrid {
     const msg = document.createElement("span");
     msg.className = "grid__filter-msg";
     filterbar.append(input, clear, msg);
-    root.appendChild(filterbar);
+    (filterMount ?? root).appendChild(filterbar);
     this.filterInput = input;
     this.filterMsg = msg;
 
@@ -417,7 +419,8 @@ class DataGrid {
       name.textContent = column.name ?? column.key;
       cell.appendChild(name);
 
-      if (column.type) {
+      // showType 为 false 时只保留类型带来的着色,不显示类型文字
+      if (column.type && column.showType !== false) {
         const type = document.createElement("span");
         type.className = "grid__col-type";
         type.textContent = column.type;
@@ -606,11 +609,42 @@ class DataGrid {
         cell.textContent = "";
         continue;
       }
+      // 列可以自带 format,用来做「语义化」的显示:Redis 的类型徽章、
+      // TTL 的 ∞、枚举的中文名这类 —— 颜色与文案都是数据的一部分。
+      if (typeof column.format === "function") {
+        const formatted = column.format(value);
+        if (formatted && typeof formatted === "object") {
+          if (formatted.badgeClass) {
+            // 徽章是单元格里的一个子元素 —— 胶囊要有自己的高度与内边距,
+            // 直接修饰单元格会把整行高度都改掉
+            cell.replaceChildren();
+            const badge = document.createElement("span");
+            badge.className = formatted.badgeClass;
+            badge.textContent = formatted.text ?? "";
+            cell.appendChild(badge);
+          } else {
+            cell.textContent = formatted.text ?? "";
+            if (formatted.className) {
+              for (const token of formatted.className.split(/\s+/).filter(Boolean)) {
+                cell.classList.add(token);
+              }
+            }
+          }
+        } else {
+          cell.textContent = formatted ?? "";
+        }
+        continue;
+      }
+
       if (value === null || value === undefined) {
         cell.textContent = "NULL";
         cell.classList.add("grid__cell--null");
       } else {
         cell.textContent = String(value);
+        // true 与 false 语义相反,不能是同一个绿
+        if (typeof value === "boolean" && value === false) {
+          cell.classList.add("grid__cell--bool-false");
+        }
       }
     }
   }

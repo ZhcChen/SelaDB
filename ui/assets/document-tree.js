@@ -116,19 +116,25 @@ class DocumentTree {
     id.textContent = String(doc?._id ?? "");
     head.appendChild(id);
 
+    // 头部右侧改成紧凑的图标按钮组 —— 文字按钮在文档卡片上太抢眼
     const actions = el("div", "doc__actions");
     const copyButton = el("button", "doc__action");
     copyButton.type = "button";
     copyButton.dataset.action = "copy";
     copyButton.dataset.docIndex = String(docIndex);
-    copyButton.textContent = "复制 JSON";
+    copyButton.title = "复制 JSON";
+    copyButton.appendChild(createIcon("copy", 13));
     actions.appendChild(copyButton);
 
     const toggleAllButton = el("button", "doc__action");
     toggleAllButton.type = "button";
     toggleAllButton.dataset.action = "toggle-all";
     toggleAllButton.dataset.docIndex = String(docIndex);
-    toggleAllButton.textContent = this.#toggleAllLabel(docIndex);
+    toggleAllButton.title = this.#toggleAllLabel(docIndex);
+    const toggleIcon = createIcon("chevron", 13);
+    toggleIcon.classList.add("doc__action-chevron");
+    if (this.#isDocExpanded(docIndex)) toggleIcon.classList.add("is-open");
+    toggleAllButton.appendChild(toggleIcon);
     actions.appendChild(toggleAllButton);
 
     head.appendChild(actions);
@@ -270,7 +276,9 @@ class DocumentTree {
 
   #syncDocAction(docIndex) {
     const button = this.docActions[docIndex]?.toggleAll;
-    if (button) button.textContent = this.#toggleAllLabel(docIndex);
+    if (!button) return;
+    button.title = this.#toggleAllLabel(docIndex);
+    button.querySelector(".doc__action-chevron")?.classList.toggle("is-open", this.#isDocExpanded(docIndex));
   }
 
   #syncAllDocActions() {

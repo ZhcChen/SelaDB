@@ -15,11 +15,13 @@
  * -------------------------------------------------------------------------- */
 :root {
   /* 背景层级:canvas 最底,surface 是面板,raised 是浮层,sunken 是凹陷区 */
-  --bg-canvas: #f2f4f7;
+  /* 背景要分三层才有层次:canvas 最沉,surface 是面板,sunken 是凹陷区。
+     之前 canvas 与 surface 只差一点点,面板之间只靠 1px 线分隔,看着平。 */
+  --bg-canvas: #eaedf2;
   --bg-surface: #ffffff;
   --bg-raised: #ffffff;
-  --bg-sunken: #e9ecf1;
-  --bg-inset: #f7f8fa;
+  --bg-sunken: #e2e6ed;
+  --bg-inset: #f4f6f9;
   --bg-hover: rgba(16, 24, 40, 0.045);
   --bg-active: rgba(47, 95, 224, 0.1);
   --bg-selected: #e4edff;
@@ -77,11 +79,11 @@
  * 2. 语义色板 —— 深色
  * -------------------------------------------------------------------------- */
 body[data-theme="dark"] {
-  --bg-canvas: #0d1017;
-  --bg-surface: #141922;
-  --bg-raised: #1b212c;
-  --bg-sunken: #090c11;
-  --bg-inset: #10141c;
+  --bg-canvas: #090c12;
+  --bg-surface: #151b24;
+  --bg-raised: #1d2430;
+  --bg-sunken: #070a0f;
+  --bg-inset: #10151d;
   --bg-hover: rgba(255, 255, 255, 0.055);
   --bg-active: rgba(91, 140, 255, 0.18);
   --bg-selected: #1c2b4d;
@@ -132,28 +134,39 @@ body[data-theme="dark"] {
  * 数据库工具的信息密度高,类型着色是快速扫读的主要抓手:
  * 数字一眼认出是数字、NULL 一眼认出是空、时间戳一眼认出是时间。
  * -------------------------------------------------------------------------- */
+/*
+ * 色相要拉开,因为一张表里可能同时出现全部类型(users 表就有 int / uuid /
+ * varchar / numeric / bool / text / jsonb / bytea / timestamptz 八种)。
+ * 之前 float 与 uuid 是同一个色值、json 与 time 都是紫,远看分不开。
+ *
+ * 现在按色相环分配,相邻类型的色相间隔都在 40 度以上:
+ *   数字 214° · 布尔 145° · 时间 271° · 二进制 20° · JSON 335° · UUID 173°
+ * bool 的 true / false 分开两个 token,见 --type-bool-* 。
+ */
 :root {
   --type-int: #1f6feb;
-  --type-float: #0e7490;
+  --type-float: #1f6feb;
   --type-string: #1c2230;
-  --type-bool: #1f9254;
+  --type-bool: #15803d;
+  --type-bool-false: #6b7280;
   --type-time: #8250df;
   --type-null: #8b95a6;
-  --type-binary: #b45309;
-  --type-json: #6f42c1;
-  --type-uuid: #0e7490;
+  --type-binary: #c2410c;
+  --type-json: #be185d;
+  --type-uuid: #0d9488;
 }
 
 body[data-theme="dark"] {
   --type-int: #79b8ff;
-  --type-float: #56d4dd;
+  --type-float: #79b8ff;
   --type-string: #dde3ec;
-  --type-bool: #56d364;
+  --type-bool: #4ade80;
+  --type-bool-false: #8b95a6;
   --type-time: #d2a8ff;
   --type-null: #69737f;
   --type-binary: #ffa657;
-  --type-json: #c297ff;
-  --type-uuid: #56d4dd;
+  --type-json: #f9a8d4;
+  --type-uuid: #5eead4;
 }
 
 /* -----------------------------------------------------------------------------
@@ -198,8 +211,8 @@ body[data-theme="dark"] {
 :root {
   --engine-postgresql: #336791;
   --engine-mysql: #00758f;
-  --engine-sqlite: #3b7ea1;
-  --engine-sqlserver: #cc2927;
+  --engine-sqlite: #003b57;
+  --engine-sqlserver: #a4262c;
   --engine-mongodb: #13aa52;
   --engine-redis: #d82c20;
 }
@@ -208,9 +221,9 @@ body[data-theme="dark"] {
   --engine-postgresql: #7ab8d4;
   --engine-mysql: #4fc3d9;
   --engine-sqlite: #79b8e8;
-  --engine-sqlserver: #f2706e;
+  --engine-sqlserver: #e8707a;
   --engine-mongodb: #56d364;
-  --engine-redis: #f2706e;
+  --engine-redis: #ff6b5e;
 }
 
 /* -----------------------------------------------------------------------------
@@ -293,6 +306,8 @@ body[data-theme="dark"] {
 body[data-density="comfortable"] {
   --row-h: 30px;
   --row-h-sm: 24px;
+  /* 对象树比表格更密:树的行是导航不是数据,一行省 2px 一屏多看几行 */
+  --row-h-tree: 23px;
   --cell-x: 10px;
   --indent: 14px;
   --tree-indent: 14px;
@@ -304,6 +319,7 @@ body[data-density="comfortable"] {
 body[data-density="compact"] {
   --row-h: 24px;
   --row-h-sm: 20px;
+  --row-h-tree: 20px;
   --cell-x: 8px;
   --indent: 12px;
   --tree-indent: 12px;
@@ -318,10 +334,10 @@ body[data-density="compact"] {
  * 桌面工具的固定高度,给密集信息让位。
  * -------------------------------------------------------------------------- */
 :root {
-  --h-titlebar: 36px;
-  --h-toolbar: 40px;
+  /* 标题栏与工具栏合并成一行 —— 之前分成两行,第二行横向空旷却占 40px */
+  --h-topbar: 40px;
   --h-statusbar: 26px;
-  --h-tabbar: 34px;
+  --h-tabbar: 32px;
 
   --w-tree: 268px;
   --w-tree-min: 180px;

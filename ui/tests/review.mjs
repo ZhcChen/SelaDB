@@ -1,0 +1,247 @@
+/**
+ * 视觉评审。
+ *
+ * 冒烟验收验的是「功能对不对」,验不了「好不好看」。这道评审补的是后一半:
+ * 把黄金截图交给多模态模型,按固定 rubric 打分,输出可定位的问题清单。
+ *
+ * 思路借自 wandb/openui 的 `backend/openui/eval/evaluate.py` —— 它用
+ * GPT-4-vision 给生成的 UI 按「媒体质量 / 对比度 / 相关性」三条 1–5 分。
+ * 这里把三条改写成适配桌面数据工具的版本,并把「媒体质量」换成
+ * 「布局与信息密度」:我们要的是专业工具的紧凑与层级,不是响应式。
+ *
+ * 用法:
+ *   node tests/review.mjs                 # 全部截图
+ *   node tests/review.mjs 02-grid 12-ddl # 只评指定几张
+ */
+
+import { execFile } from "node:child_process";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+const exec = promisify(execFile);
+
+const here = dirname(fileURLToPath(import.meta.url));
+const shotDir = join(here, "screenshots");
+const reportPath = join(here, "review-report.md");
+
+/**
+ * 每张图是什么界面。
+ *
+ * 评审模型不知道 SelaDB 是什么,不给它上下文的话,评出来的会是
+ * 「一个通用的表格界面好不好看」,而不是「这个数据库工具好不好看」。
+ */
+const SCREENSHOT_CONTEXT = {
+  "01-workbench-light": "SelaDB 主工作台(浅色主题):左侧对象树 + 右侧空白工作区,顶部标题栏与工具栏,底部状态栏。",
+  "02-grid": "SelaDB 的数据网格:左侧对象树,右侧是 PostgreSQL 的 users 表,含虚拟滚动的数据行、粘性表头、类型着色、NULL 样式。",
+  "03-nosql": "SelaDB 的 Redis 键列表:左侧对象树展开到 db0 与类型分组,右侧是键值表格。",
+  "04-workbench-dark": "SelaDB 主工作台(深色主题):左侧对象树 + 右侧空白工作区。",
+  "05-spec": "SelaDB 的设计规范页:展示设计 token 色板(主题色、数据类型色板、引擎品牌色)与组件清单表格。",
+  "06-entry": "SelaDB 设计源的总入口页,两张卡片分别通向规范页与产品预览。",
+  "07-query": "SelaDB 的 SQL 查询编辑器:上方是可编辑并带语法高亮的 SQL,下方是执行结果的数据网格。",
+  "08-query-error": "SelaDB 的 SQL 查询错误状态:编辑器里出错的表名被标红波浪线,下方是红色错误提示条与错误详情区。",
+  "09-palette": "SelaDB 的命令面板(⌘K):居中弹层,输入框加模糊匹配的结果列表。",
+  "10-document-tree": "SelaDB 的 MongoDB 文档视图:可折叠的 BSON 树,按字段名与值分列。",
+  "11-structure": "SelaDB 的表结构视图:列 / 索引 / 约束 / 外键四个子标签,下面是列定义表格。",
+  "12-ddl": "SelaDB 的 DDL 预览:按引擎方言生成的建表语句,带 SQL 语法高亮。",
+  "13-context-menu": "SelaDB 对象树上的右键菜单,浮在数据网格之上。",
+  "14-value-editor": "SelaDB 的 Redis 键值编辑器:右侧抽屉里是元信息与按类型渲染的值编辑区。",
+  "15-connect": "SelaDB 的新建连接向导:引擎卡片网格加参数表单。",
+};
+
+/** 评分口径。三条各 1–5 分,每条都要给出问题清单。 */
+const RUBRIC = `
+你在评审一个**跨平台数据库管理工具 SelaDB** 的界面截图。它的定位是专业工具:
+使用者是开发者与 DBA,一天要在里面待几个小时,密集地看表结构、翻数据、写 SQL。
+参考对象是 TablePlus、DBeaver、Beekeeper Studio、Navicat 这类工具,不是 Linear、Notion、
+Vercel Dashboard 这类通用 SaaS 后台。
+
+请按下面三条各打 1–5 分(5 = 优秀,3 = 及格但有明显可改进处,1 = 不可接受),
+并给出**具体、可定位**的问题清单:
+
+1. layout —— 布局与信息密度
+   - 层级是否清楚(哪些是导航、哪些是内容、哪些是状态)
+   - 密度是否适合专业数据库工具(同一屏能看到多少行/多少列)
+   - 留白与紧凑是否失衡;面板比例是否合理
+   - 有没有视觉噪音(多余的分隔线、装饰、对不齐的间距)
+
+2. contrast —— 对比度与类型可辨识
+   - 正文、表格数字、表头、注释、次要文字是否都读得清
+   - 数据类型着色(整数/浮点/布尔/时间/NULL/JSON/UUID)彼此是否分得开;
+     同色系的不同类型(例如浅青蓝与深蓝)会不会混淆
+   - 明暗两种主题下是否有对比度不足的地方
+   - 语义色是否成对(成功/警告/危险)且不只靠颜色区分
+
+3. professionalism —— 专业观感
+   - 像不像成熟商业数据库工具,还是像通用后台模板 / SaaS 页面
+   - 有没有"网页表单"式的观感(大按钮、圆角过度、装饰性图标)
+   - 密集数据区域与操作控件的视觉权重是否平衡
+
+最后给出 top_fixes:按影响从大到小排 3–6 条**具体到能直接动手**的修改建议
+(例:"把表头类型注解的字号从 11px 提到 12px 并加深到 --fg-muted",
+"布尔值 true/false 改成一绿一灰",而不是"提升可读性")。
+
+只返回 JSON,不要多余文字:
+{
+  "layout": {"score": 0, "reason": "", "issues": [""]},
+  "contrast": {"score": 0, "reason": "", "issues": [""]},
+  "professionalism": {"score": 0, "reason": "", "issues": [""]},
+  "top_fixes": [""]
+}`;
+
+/** 调 mcode-tools 上传本地文件,拿临时 URL。 */
+async function upload(filePath) {
+  const { stdout } = await exec("mcode-tools", ["upload_temp_url", filePath]);
+  return JSON.parse(stdout).temp_url;
+}
+
+/** 调多模态模型评一张图。 */
+async function review(filePath, context) {
+  const url = await upload(filePath);
+  const prompt = `${context}\n\n${RUBRIC}`;
+  const args = {
+    image_info: [{ url, mime_type: "image/png", prompt }],
+  };
+  const argsFile = join("/tmp", `seladb-review-${process.pid}-${Date.now()}.json`);
+  await writeFile(argsFile, JSON.stringify(args), "utf8");
+
+  const { stdout } = await exec("mcode-tools", [
+    "connector",
+    "call",
+    "connector__matrix__describe_images",
+    "--args-file",
+    argsFile,
+  ]);
+  const payload = JSON.parse(stdout);
+  const description = payload?.results?.[0]?.description ?? "";
+
+  // 模型返回的是 ```json 包裹的文本
+  const match = description.match(/```json\s*([\s\S]*?)```/);
+  const text = match ? match[1] : description;
+  return JSON.parse(text);
+}
+
+// ---- 主流程 ----
+
+const all = (await readdir(shotDir)).filter((name) => name.endsWith(".png")).sort();
+const wanted = process.argv.slice(2);
+const targets = wanted.length
+  ? all.filter((name) => wanted.some((key) => name.startsWith(key)))
+  : all;
+
+console.log(`待评审 ${targets.length} 张截图\n`);
+
+const results = [];
+for (const name of targets) {
+  const key = name.replace(/\.png$/, "");
+  const context = SCREENSHOT_CONTEXT[key] ?? "SelaDB 的一个界面截图。";
+  process.stdout.write(`  ${key} … `);
+  try {
+    const score = await review(join(shotDir, name), context);
+    const total = score.layout.score + score.contrast.score + score.professionalism.score;
+    console.log(
+      `布局 ${score.layout.score} / 对比 ${score.contrast.score} / 专业 ${score.professionalism.score}  合计 ${total}/15`,
+    );
+    results.push({ key, name, context, ...score, total });
+  } catch (error) {
+    console.log(`失败: ${error.message?.split("\n")[0]}`);
+    results.push({ key, name, context, error: error.message });
+  }
+}
+
+const ok = results.filter((r) => !r.error);
+const avg = (axis) =>
+  ok.length ? (ok.reduce((sum, r) => sum + r[axis].score, 0) / ok.length).toFixed(2) : "—";
+
+// ---- 出报告 ----
+
+const lines = [];
+lines.push("# 视觉评审报告");
+lines.push("");
+lines.push(
+  `> 由 \`tests/review.mjs\` 生成:把黄金截图交给多模态模型,按固定 rubric 打分。`,
+);
+lines.push(
+  "> 思路借自 wandb/openui 的 `backend/openui/eval/evaluate.py`,三条维度改写成了适配桌面数据工具的版本。",
+);
+lines.push("");
+lines.push(
+  `评审 ${ok.length} 张,平均分:布局 **${avg("layout")}** / 对比 **${avg("contrast")}** / 专业 **${avg("professionalism")}**`,
+);
+lines.push("");
+lines.push("| 截图 | 场景 | 布局 | 对比 | 专业 | 合计 |");
+lines.push("|---|---|---|---|---|---|");
+for (const r of results) {
+  if (r.error) {
+    lines.push(`| ${r.key} | — | — | — | — | 失败 |`);
+    continue;
+  }
+  lines.push(
+    `| ${r.key} | ${r.context.slice(0, 22)}… | ${r.layout.score} | ${r.contrast.score} | ${r.professionalism.score} | **${r.total}** |`,
+  );
+}
+lines.push("");
+
+// 汇总所有问题,按出现频次排 —— 同一个问题被多次提到,说明是真问题
+const issues = new Map();
+for (const r of ok) {
+  for (const axis of ["layout", "contrast", "professionalism"]) {
+    for (const issue of r[axis].issues ?? []) {
+      const key = issue.trim();
+      if (!key) continue;
+      if (!issues.has(key)) issues.set(key, { count: 0, screens: [] });
+      const entry = issues.get(key);
+      entry.count += 1;
+      entry.screens.push(r.key);
+    }
+  }
+}
+lines.push("## 被反复提到的问题");
+lines.push("");
+const ranked = [...issues.entries()].sort((a, b) => b[1].count - a[1].count);
+if (ranked.length === 0) {
+  lines.push("(无)");
+} else {
+  for (const [issue, entry] of ranked) {
+    lines.push(`- **${issue}**`);
+    lines.push(`  - 出现 ${entry.count} 次:${entry.screens.join("、")}`);
+  }
+}
+lines.push("");
+
+lines.push("## 逐张详情");
+lines.push("");
+for (const r of results) {
+  lines.push(`### ${r.key}`);
+  lines.push("");
+  if (r.error) {
+    lines.push(`评审失败:${r.error.split("\n")[0]}`);
+    lines.push("");
+    continue;
+  }
+  lines.push(`> ${r.context}`);
+  lines.push("");
+  for (const axis of ["layout", "contrast", "professionalism"]) {
+    const label = { layout: "布局与信息密度", contrast: "对比度与类型可辨识", professionalism: "专业观感" }[axis];
+    lines.push(`**${label} — ${r[axis].score}/5**`);
+    lines.push("");
+    lines.push(`${r[axis].reason}`);
+    lines.push("");
+    for (const issue of r[axis].issues ?? []) {
+      lines.push(`- ${issue}`);
+    }
+    if ((r[axis].issues ?? []).length) lines.push("");
+  }
+  if ((r.top_fixes ?? []).length) {
+    lines.push("**修改建议**");
+    lines.push("");
+    for (const fix of r.top_fixes) {
+      lines.push(`- ${fix}`);
+    }
+    lines.push("");
+  }
+}
+
+await writeFile(reportPath, lines.join("\n"), "utf8");
+console.log(`\n报告已写入 ${reportPath}`);

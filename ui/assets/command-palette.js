@@ -116,6 +116,25 @@ class CommandPalette {
     list.className = "palette__list";
     palette.appendChild(list);
 
+    // 底部快捷键提示栏 —— 命令面板不给提示,用户不知道能怎么操作
+    const footer = document.createElement("div");
+    footer.className = "palette__footer";
+    for (const [keys, desc] of [
+      ["↑↓", "导航"],
+      ["↵", "打开"],
+      ["esc", "退出"],
+    ]) {
+      const item = document.createElement("span");
+      item.className = "palette__hint";
+      const key = document.createElement("kbd");
+      key.className = "palette__kbd";
+      key.textContent = keys;
+      item.appendChild(key);
+      item.appendChild(document.createTextNode(desc));
+      footer.appendChild(item);
+    }
+    palette.appendChild(footer);
+
     overlay.appendChild(palette);
     container.appendChild(overlay);
 

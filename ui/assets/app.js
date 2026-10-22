@@ -156,7 +156,11 @@ class TableDataView extends DataView {
     this.ddl = generateDdl(ctx.dataKey);
     this.mode = ctx.mode ?? "data";
 
-    this.head = buildPanelHead(ctx, "");
+    // 过滤条挂到面板头,不给它独占一行
+    this.filterHost = document.createElement("div");
+    this.filterHost.className = "grid__filter-slot";
+
+    this.head = buildPanelHead(ctx, "", [this.filterHost]);
     this.element.appendChild(this.head);
 
     // 数据 / 结构 / DDL 三种视图共用一个 Tab —— 拆成三个 Tab 会让标签栏爆掉,
@@ -234,6 +238,7 @@ class TableDataView extends DataView {
       columns: this.data.columns,
       rows,
       total: this.data.total,
+      filterMount: this.filterHost,
       onCellChange: (rowIndex, key, oldValue, newValue) => {
         // 设计源里只做提示,真实提交由 Rust 侧的 service 层负责
         console.info("单元格变更", { rowIndex, key, oldValue, newValue });
@@ -312,15 +317,29 @@ function expandRows(rows, columns, target) {
   return out;
 }
 
-/** 按序号派生一个形如 UUID v4 的确定性标识。 */
+/**
+ * 按序号派生一个形如 UUID v4 的确定性标识。
+ *
+ * 直接把序号转十六进制会让前几组全是 0000,一眼假。这里先做一次
+ * FNV-1a 散列再取十六进制,出来的分布跟真 UUID 一样散。
+ */
 function deriveUuid(index) {
-  const base = index.toString(16).padStart(16, "0");
+  let hash = 0x811c9dc5 ^ index;
+  for (let i = 0; i < 4; i += 1) {
+    hash ^= hash >>> 15;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  const base = hash.toString(16).padStart(8, "0");
+  const tail = (hash * 2654435761)
+    .toString(16)
+    .padStart(12, "0")
+    .slice(0, 12);
   return [
     base.slice(0, 4),
     base.slice(4, 8),
-    `4${base.slice(8, 12)}`,
-    `8${base.slice(12, 16)}`,
-    "000000000000",
+    `4${base.slice(0, 3)}`,
+    `8${base.slice(3, 6)}`,
+    tail,
   ].join("-");
 }
 
@@ -369,13 +388,33 @@ class KeyValueListView extends DataView {
     this.element.appendChild(body);
 
     this.grid = new DataGrid({
+      // 键列表不是关系表,表头不该挂 SQL 类型标注 —— 纯化成 Key / Type / TTL / Size / Value
       columns: [
-        { key: "key", name: "key", type: "varchar(128)", width: 280 },
-        // 这一列的值本身就是 string / hash / list,再标一次 varchar 反而挤掉列名
-        { key: "type", name: "type", width: 110 },
-        { key: "ttl", name: "ttl", type: "int", width: 100 },
-        { key: "size", name: "size", type: "int", width: 100 },
-        { key: "preview", name: "value", type: "text", width: 320 },
+        { key: "key", name: "key", type: "varchar(128)", width: 280, showType: false },
+        {
+          key: "type",
+          name: "type",
+          type: "varchar(16)",
+          width: 110,
+          showType: false,
+          // 类型用语义色徽章:一眼分清 string / hash / list / set / zset
+          format: (value) => ({
+            text: value,
+            badgeClass: `grid__badge grid__badge--${value}`,
+          }),
+        },
+        {
+          key: "ttl",
+          name: "ttl",
+          type: "int",
+          width: 100,
+          showType: false,
+          // -1 是「永不过期」,直接显示数字会让人以为出错了
+          format: (value) =>
+            value === -1 ? { text: "∞", className: "grid__cell--falsy" } : String(value),
+        },
+        { key: "size", name: "size", type: "int", width: 100, showType: false },
+        { key: "preview", name: "value", type: "text", width: 320, showType: false },
       ],
       rows: keys.map((entry) => ({
         key: entry.key,
@@ -420,7 +459,7 @@ function previewValue(entry) {
  * 4. 通用片段
  * -------------------------------------------------------------------------- */
 
-function buildPanelHead(ctx, meta) {
+function buildPanelHead(ctx, meta, controls = []) {
   const head = document.createElement("div");
   head.className = "panel__head";
 
@@ -450,6 +489,11 @@ function buildPanelHead(ctx, meta) {
   sub.textContent = ctx.subtitle ?? "";
   head.appendChild(sub);
 
+  // 控件槽:表格的过滤条挂这儿,不占网格上方的纵向空间
+  for (const control of controls) {
+    head.appendChild(control);
+  }
+
   const spacer = document.createElement("div");
   spacer.className = "panel__spacer";
   head.appendChild(spacer);
@@ -461,6 +505,130 @@ function buildPanelHead(ctx, meta) {
 
   return head;
 }
+
+/**
+ * 空工作区的「快速开始」。
+ *
+ * 一块空白加两行居中的字,是网页后台的空状态,不是桌面工具的空状态。
+ * 真实工具在这里给的是下一步动作:开查询、开连接、回到最近看过的表。
+ */
+function buildStartPanel() {
+  const panel = document.createElement("div");
+  panel.className = "start";
+
+  const inner = document.createElement("div");
+  inner.className = "start__inner";
+
+  const title = document.createElement("div");
+  title.className = "start__title";
+  title.textContent = "快速开始";
+  inner.appendChild(title);
+
+  const grid = document.createElement("div");
+  grid.className = "start__grid";
+
+  const actions = [
+    {
+      icon: "play",
+      title: "新建查询",
+      desc: "在当前连接上写 SQL",
+      shortcut: "⌘T",
+      run: () => openQueryTab(),
+    },
+    {
+      icon: "plus",
+      title: "新建连接",
+      desc: "添加一个数据库连接",
+      run: () => {
+        location.hash = "#/connect";
+      },
+    },
+    {
+      icon: "search",
+      title: "全局搜索",
+      desc: "按表名、字段名找对象",
+      shortcut: "⌘K",
+      run: () => state.palette?.open(),
+    },
+  ];
+
+  for (const action of actions) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "start__card";
+    card.addEventListener("click", action.run);
+
+    const icon = document.createElement("span");
+    icon.className = "start__icon";
+    icon.appendChild(createIcon(action.icon, 16));
+    card.appendChild(icon);
+
+    const text = document.createElement("span");
+    text.className = "start__text";
+    const name = document.createElement("span");
+    name.className = "start__card-title";
+    name.textContent = action.title;
+    text.appendChild(name);
+    const desc = document.createElement("span");
+    desc.className = "start__card-desc";
+    desc.textContent = action.desc;
+    text.appendChild(desc);
+    card.appendChild(text);
+
+    if (action.shortcut) {
+      const kbd = document.createElement("span");
+      kbd.className = "start__kbd";
+      kbd.textContent = action.shortcut;
+      card.appendChild(kbd);
+    }
+    grid.appendChild(card);
+  }
+  inner.appendChild(grid);
+
+  // 最近打开 —— 数据库工具的高频入口就是「回到刚才那张表」
+  const recent = document.createElement("div");
+  recent.className = "start__recent";
+  const recentTitle = document.createElement("div");
+  recentTitle.className = "start__recent-title";
+  recentTitle.textContent = "最近打开";
+  recent.appendChild(recentTitle);
+
+  const recentList = document.createElement("div");
+  recentList.className = "start__recent-list";
+  for (const key of RECENT_OBJECTS) {
+    const entry = state.nodeIndex.get(key);
+    if (!entry) continue;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "start__recent-item";
+    const badge = document.createElement("span");
+    badge.className = `engine-badge engine-${entry.connection.engine}`;
+    const dot = document.createElement("span");
+    dot.className = "engine-badge__dot";
+    badge.appendChild(dot);
+    badge.appendChild(document.createTextNode(ENGINES[entry.connection.engine].label));
+    item.appendChild(badge);
+    const name = document.createElement("span");
+    name.className = "start__recent-name";
+    name.textContent = entry.node.label;
+    item.appendChild(name);
+    item.addEventListener("click", () => openTabForNode(entry.node));
+    recentList.appendChild(item);
+  }
+  recent.appendChild(recentList);
+  inner.appendChild(recent);
+
+  panel.appendChild(inner);
+  return panel;
+}
+
+/** 「最近打开」里列哪些对象。 */
+const RECENT_OBJECTS = [
+  "mysql-local/shop/users",
+  "pg-local/postgres/public/orders",
+  "mongo-local/shop/users",
+  "pg-local/postgres/public/users",
+];
 
 function buildEmpty(title, desc) {
   const empty = document.createElement("div");
@@ -491,163 +659,96 @@ function button(label, { icon, className = "btn", onClick, title } = {}) {
 }
 
 /* -----------------------------------------------------------------------------
- * 5. 标题栏
+ * 5. 顶栏
+ *
+ * 标题栏与工具栏合并成一行。之前工具栏只有四五个操作,横向空得发慌,却实实在在
+ * 占掉 40px 纵向空间 —— 那是数据网格最该拿到的位置。
+ *
+ * 排布:品牌 | 数据级操作 ......... 事务 | 当前连接 | 搜索 | 图标
+ * 操作按钮一律 Ghost 样式。桌面工具的操作条不该是一排带描边的大圆角网页按钮,
+ * 右上角也不该挂一个营销页式的蓝色主按钮。
  * -------------------------------------------------------------------------- */
-function buildTitlebar() {
+function buildTopbar() {
   const bar = document.createElement("header");
-  bar.className = "titlebar";
+  bar.className = "topbar";
 
   const brand = document.createElement("div");
-  brand.className = "titlebar__brand";
+  brand.className = "topbar__brand";
   const logo = document.createElement("span");
-  logo.className = "titlebar__logo";
+  logo.className = "topbar__logo";
   brand.appendChild(logo);
   brand.appendChild(document.createTextNode("SelaDB"));
   bar.appendChild(brand);
 
-  const spacer = document.createElement("div");
-  spacer.className = "titlebar__spacer";
-  bar.appendChild(spacer);
+  bar.appendChild(buildSeparator());
 
-  const search = document.createElement("div");
-  search.className = "titlebar__search";
-  const input = document.createElement("input");
-  input.type = "text";
-  input.placeholder = "搜索对象或执行命令";
-  input.setAttribute("aria-label", "全局搜索");
-  // 真正的输入在命令面板里,这里只是个入口
-  input.readOnly = true;
-  input.addEventListener("focus", () => state.palette?.open());
-  input.addEventListener("click", () => state.palette?.open());
-  search.appendChild(input);
-  const hint = document.createElement("span");
-  hint.className = "titlebar__search-hint";
-  hint.textContent = "⌘K";
-  search.appendChild(hint);
-  bar.appendChild(search);
-
-  const themeBtn = button("", {
-    className: "btn btn--ghost btn--icon",
-    icon: "sun",
-    title: "切换主题",
-    onClick: () => {
-      const order = ["system", "light", "dark"];
-      const next = order[(order.indexOf(state.theme) + 1) % order.length];
-      applyTheme(next);
-      syncSettingsControls();
-    },
-  });
-  bar.appendChild(themeBtn);
-
-  bar.appendChild(
+  // 数据级操作
+  const actions = document.createElement("div");
+  actions.className = "topbar__group";
+  actions.appendChild(
     button("", {
-      className: "btn btn--ghost btn--icon",
-      icon: "columns",
-      title: "切换密度",
-      onClick: () => {
-        applyDensity(state.density === "compact" ? "comfortable" : "compact");
-        syncSettingsControls();
-      },
+      className: "btn btn--tool",
+      icon: "refresh",
+      title: "刷新",
+      onClick: () => renderWorkspace(),
     }),
   );
-
-  bar.appendChild(
-    button("", {
-      className: "btn btn--ghost btn--icon",
-      icon: "settings",
-      title: "设置",
-      onClick: () => {
-        location.hash = "#/settings";
-      },
-    }),
-  );
-
-  bar.appendChild(
-    button("新建连接", {
-      className: "btn btn--primary",
-      icon: "plus",
-      onClick: () => {
-        location.hash = "#/connect";
-      },
-    }),
-  );
-
-  return bar;
-}
-
-/* -----------------------------------------------------------------------------
- * 6. 工具栏
- *
- * 左区是数据级操作,右区是连接级操作。提交/回滚只作用于当前 Tab 所属连接,
- * 这条归属在右侧的连接标识上明示。
- * -------------------------------------------------------------------------- */
-function buildToolbar() {
-  const bar = document.createElement("div");
-  bar.className = "toolbar";
-
-  const left = document.createElement("div");
-  left.className = "toolbar__group";
-  left.appendChild(button("刷新", { icon: "refresh", onClick: () => renderWorkspace() }));
-  left.appendChild(
-    button("打开查询", {
+  actions.appendChild(
+    button("查询", {
+      className: "btn btn--tool",
       icon: "play",
+      title: "打开查询 ⌘↵",
       onClick: () => openQueryTab(),
     }),
   );
-  bar.appendChild(left);
-
-  const div1 = document.createElement("div");
-  div1.className = "toolbar__divider";
-  bar.appendChild(div1);
-
-  const mid = document.createElement("div");
-  mid.className = "toolbar__group";
-  mid.appendChild(
+  actions.appendChild(
     button("提交", {
-      className: "btn",
+      className: "btn btn--tool",
       icon: "check",
-      onClick: () => {
-        console.info("提交当前连接的事务");
-      },
+      title: "提交当前连接的事务",
+      onClick: () => console.info("提交当前连接的事务"),
     }),
   );
-  const rollback = button("回滚", { className: "btn", icon: "refresh" });
-  rollback.addEventListener("click", () => {
-    console.info("回滚当前连接的事务");
-  });
-  mid.appendChild(rollback);
-  bar.appendChild(mid);
+  actions.appendChild(
+    button("回滚", {
+      className: "btn btn--tool",
+      icon: "refresh",
+      title: "回滚当前连接的事务",
+      onClick: () => console.info("回滚当前连接的事务"),
+    }),
+  );
+  bar.appendChild(actions);
 
   const spacer = document.createElement("div");
-  spacer.className = "toolbar__spacer";
+  spacer.className = "topbar__spacer";
   bar.appendChild(spacer);
 
-  const txLabel = document.createElement("span");
-  txLabel.className = "toolbar__label";
-  txLabel.textContent = "事务";
-  bar.appendChild(txLabel);
-  bar.appendChild(
-    button("Auto", {
-      className: "btn",
-      onClick: (event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        openMenu(
-          [
-            { label: "Auto(自动提交)", action: () => {} },
-            { label: "Manual(手动提交)", action: () => {} },
-          ],
-          { x: rect.left, y: rect.bottom + 4 },
-        );
-      },
-    }),
-  );
+  // 事务模式:做成规范的下拉,原来那个「Auto」按钮既不像下拉也不像开关
+  const tx = document.createElement("div");
+  tx.className = "topbar__group";
+  const txBtn = button("Auto", {
+    className: "btn btn--tool",
+    title: "事务模式",
+    onClick: (event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      openMenu(
+        [
+          { label: "Auto(自动提交)", action: () => {} },
+          { label: "Manual(手动提交)", action: () => {} },
+        ],
+        { x: rect.left, y: rect.bottom + 4 },
+      );
+    },
+  });
+  txBtn.appendChild(caretIcon());
+  tx.appendChild(txBtn);
+  bar.appendChild(tx);
 
-  const div2 = document.createElement("div");
-  div2.className = "toolbar__divider";
-  bar.appendChild(div2);
-
-  // 当前 Tab 所属连接 —— 提交/回滚的作用对象
-  const connBtn = button("—", { className: "btn", title: "当前连接" });
+  // 当前连接:提交/回滚的作用对象
+  const connBtn = button("—", {
+    className: "btn btn--tool",
+    title: "当前连接",
+  });
   connBtn.dataset.role = "current-connection";
   connBtn.addEventListener("click", (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -661,8 +762,93 @@ function buildToolbar() {
   });
   bar.appendChild(connBtn);
 
+  bar.appendChild(buildSeparator());
+
+  // 搜索
+  const search = document.createElement("div");
+  search.className = "topbar__search";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "搜索对象或执行命令";
+  input.setAttribute("aria-label", "全局搜索");
+  // 真正的输入在命令面板里,这里只是个入口
+  input.readOnly = true;
+  input.addEventListener("focus", () => state.palette?.open());
+  input.addEventListener("click", () => state.palette?.open());
+  search.appendChild(input);
+  const hint = document.createElement("span");
+  hint.className = "topbar__search-hint";
+  hint.textContent = "⌘K";
+  search.appendChild(hint);
+  bar.appendChild(search);
+
+  // 图标组
+  const icons = document.createElement("div");
+  icons.className = "topbar__icons";
+  icons.appendChild(
+    button("", {
+      className: "btn btn--tool btn--icon",
+      icon: "sun",
+      title: "切换主题",
+      onClick: () => {
+        const order = ["system", "light", "dark"];
+        applyTheme(order[(order.indexOf(state.theme) + 1) % order.length]);
+        syncSettingsControls();
+      },
+    }),
+  );
+  icons.appendChild(
+    button("", {
+      className: "btn btn--tool btn--icon",
+      icon: "columns",
+      title: "切换密度",
+      onClick: () => {
+        applyDensity(state.density === "compact" ? "comfortable" : "compact");
+        syncSettingsControls();
+      },
+    }),
+  );
+  icons.appendChild(
+    button("", {
+      className: "btn btn--tool btn--icon",
+      icon: "settings",
+      title: "设置",
+      onClick: () => {
+        location.hash = "#/settings";
+      },
+    }),
+  );
+  // 新建连接降权成图标按钮 —— 右上角挂一个蓝色大按钮太像营销页
+  icons.appendChild(
+    button("", {
+      className: "btn btn--tool btn--icon",
+      icon: "plus",
+      title: "新建连接",
+      onClick: () => {
+        location.hash = "#/connect";
+      },
+    }),
+  );
+  bar.appendChild(icons);
+
   return bar;
 }
+
+/** 顶栏里的竖向分隔线。 */
+function buildSeparator() {
+  const sep = document.createElement("div");
+  sep.className = "topbar__sep";
+  return sep;
+}
+
+/** 下拉箭头。 */
+function caretIcon() {
+  const span = document.createElement("span");
+  span.className = "btn__caret";
+  span.textContent = "▾";
+  return span;
+}
+
 
 /**
  * 树节点右键菜单。
@@ -751,8 +937,6 @@ async function confirmDeleteNode(node) {
     toast(`已删除「${node.label}」(mock)`, { type: "success" });
   }
 }
-
-/** 复制到剪贴板,非安全上下文下退回老办法。 */
 
 /* -----------------------------------------------------------------------------
  * 7. 对象树面板
@@ -968,9 +1152,7 @@ function renderWorkspace() {
   const tab = state.tabs.find((item) => item.id === state.activeTabId);
 
   if (!tab) {
-    host.appendChild(
-      buildEmpty("没有打开的对象", "在左侧对象树里选择一个表、集合或键分组"),
-    );
+    host.appendChild(buildStartPanel());
     updateStatusBar(null);
     return;
   }
@@ -1231,8 +1413,9 @@ function updateStatusBar(tab) {
   // 工具栏上的「当前连接」要跟状态栏一致:提交/回滚只作用于这个连接
   const connBtn = document.querySelector('[data-role="current-connection"]');
   if (connBtn) {
-    connBtn.textContent = connection ? connection.label : "—";
+    connBtn.textContent = connection ? connection.label : "未选择连接";
     connBtn.disabled = !connection;
+    connBtn.style.display = connection ? "" : "none";
   }
 }
 
@@ -1254,8 +1437,7 @@ function renderWorkbench(root) {
   const app = document.createElement("div");
   app.className = "app";
 
-  app.appendChild(buildTitlebar());
-  app.appendChild(buildToolbar());
+  app.appendChild(buildTopbar());
 
   const body = document.createElement("div");
   body.className = "app__body";
@@ -1395,6 +1577,24 @@ function renderEntry(root) {
   cards.appendChild(specCard);
 
   inner.appendChild(cards);
+
+  // 引擎徽标 —— 入口页要一眼看出支持哪些数据库
+  const engines = document.createElement("div");
+  engines.className = "entry__engines";
+  const enginesLabel = document.createElement("span");
+  enginesLabel.className = "entry__engines-label";
+  enginesLabel.textContent = "第一版支持";
+  engines.appendChild(enginesLabel);
+  for (const engine of Object.values(ENGINES)) {
+    const badge = document.createElement("span");
+    badge.className = `engine-badge engine-${engine.id}`;
+    const dot = document.createElement("span");
+    dot.className = "engine-badge__dot";
+    badge.appendChild(dot);
+    badge.appendChild(document.createTextNode(engine.label));
+    engines.appendChild(badge);
+  }
+  inner.appendChild(engines);
 
   const foot = document.createElement("div");
   foot.className = "entry__foot";
@@ -1636,8 +1836,15 @@ function renderConnect(root) {
   });
   const spacer = document.createElement("div");
   spacer.className = "wizard__actions-spacer";
+  // 第二步要先能测连通,再谈保存 —— 这是连数据库的基本节奏
+  const testBtn = button("测试连接", {
+    icon: "check",
+    onClick: () => {
+      toast(`已测试 ${stepState.engine?.label ?? "连接"}:连通(mock)`, { type: "success" });
+    },
+  });
   const nextBtn = button("下一步", { className: "btn btn--primary" });
-  actions.append(backBtn, spacer, nextBtn);
+  actions.append(backBtn, spacer, testBtn, nextBtn);
   wizard.appendChild(actions);
 
   const stepState = { step: 1, engine: null, values: {} };
@@ -1647,6 +1854,7 @@ function renderConnect(root) {
     renderStepBar();
     renderStepBody();
     backBtn.disabled = stepState.step === 1;
+    testBtn.hidden = stepState.step !== 2;
     nextBtn.textContent = stepState.step === 3 ? "保存连接" : "下一步";
     nextBtn.disabled = stepState.step === 1 && !stepState.engine;
   }
