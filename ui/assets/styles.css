@@ -137,7 +137,9 @@ button {
 .topbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  /* 组与组之间 8px。之前是 4px,顶栏右段(提交/回滚 · Auto · 当前连接 ·
+     搜索框 · 图标 · 设置)一路 4px 挤到底,密集到读不出分组。 */
+  gap: var(--sp-4);
   height: var(--h-topbar);
   padding: 0 var(--sp-4);
   background: var(--bg-panel);
@@ -149,7 +151,8 @@ button {
   height: 18px;
   background: var(--border-subtle);
   flex: none;
-  margin: 0 var(--sp-2);
+  /* 分隔线两侧各留 2px,加上组间距,分隔处有 10px 的呼吸 */
+  margin: 0 var(--sp-1);
 }
 
 .topbar__group {
@@ -196,7 +199,7 @@ button {
    顶栏与侧栏都是外壳面板色,输入位靠 --bg-input(白底)+ 1px 边从面板上浮起来。 */
 .topbar__search {
   position: relative;
-  width: 180px;
+  width: 220px;
   flex: none;
 }
 

@@ -372,7 +372,7 @@ body[data-density="comfortable"] {
   --row-h: 32px;
   --row-h-sm: 26px;
   /* 树的一级缩进步长。层级要看得出来,靠的不只是缩进,还有导轨线。 */
-  --row-h-tree: 27px;
+  --row-h-tree: 29px;
   --cell-x: 10px;
   --indent: 16px;
   --tree-indent: 16px;
@@ -385,7 +385,7 @@ body[data-density="comfortable"] {
 body[data-density="compact"] {
   --row-h: 26px;
   --row-h-sm: 22px;
-  --row-h-tree: 24px;
+  --row-h-tree: 26px;
   --cell-x: 8px;
   --indent: 14px;
   --tree-indent: 14px;
@@ -405,9 +405,9 @@ body[data-density="compact"] {
   --h-statusbar: 28px;
   --h-tabbar: 36px;
 
-  --w-tree: 268px;
-  --w-tree-min: 180px;
-  --w-tree-max: 520px;
+  --w-tree: 296px;
+  --w-tree-min: 200px;
+  --w-tree-max: 560px;
   --w-statusbar-pad: var(--sp-4);
 }
 
