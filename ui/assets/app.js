@@ -837,17 +837,7 @@ function buildTopbar() {
   });
   icons.appendChild(themeBtn);
 
-  icons.appendChild(
-    button("", {
-      className: "btn btn--tool btn--icon",
-      icon: "columns",
-      title: `密度:${DENSITY_LABEL[state.density]}`,
-      onClick: () => {
-        applyDensity(state.density === "compact" ? "comfortable" : "compact");
-        syncSettingsControls();
-      },
-    }),
-  );
+  // 密度挪到设置页 —— 顶栏本来就有八个控件,再多一个就挤了
   // 新建连接降权成图标按钮 —— 右上角挂一个蓝色大按钮太像营销页
   icons.appendChild(
     button("", {

@@ -744,23 +744,26 @@
   gap: var(--sp-3);
 }
 
-/* 浮层卡片:比画布更亮 + 1px 边框 + 圆角,靠边界立住 */
+/* 浮层卡片:无边框,靠周边阴影立住 */
 .start__card {
   display: flex;
   align-items: flex-start;
   gap: var(--sp-4);
-  padding: var(--sp-4);
+  padding: var(--sp-5);
   background: var(--bg-raised);
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--r-xl);
+  box-shadow: var(--card-shadow);
   text-align: left;
-  transition: border-color var(--dur-fast) var(--ease-out),
-    background var(--dur-fast) var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
 .start__card:hover {
-  border-color: var(--accent-border);
-  background: var(--bg-hover);
+  transform: translateY(-1px);
+  box-shadow:
+    0 14px 34px -10px rgba(0, 0, 0, 0.3),
+    0 4px 10px -3px rgba(0, 0, 0, 0.14);
 }
 
 .start__icon {

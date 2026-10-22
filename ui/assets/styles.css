@@ -127,11 +127,11 @@ button {
 .topbar {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   height: var(--h-topbar);
-  padding: 0 var(--sp-3);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
+  padding: 0 var(--sp-4);
+  background: var(--bg-canvas);
+  border-bottom: none;
 }
 
 .topbar__brand {
@@ -157,14 +157,15 @@ button {
 .topbar__sep {
   width: 1px;
   height: 18px;
-  background: var(--border-default);
+  background: var(--border-subtle);
   flex: none;
+  margin: 0 var(--sp-2);
 }
 
 .topbar__group {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
   flex: none;
 }
 
@@ -201,7 +202,7 @@ button {
 /* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框 */
 .topbar__search {
   position: relative;
-  width: 220px;
+  width: 180px;
   flex: none;
 }
 
@@ -247,7 +248,7 @@ button {
 .topbar__icons {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
   flex: none;
 }
 
@@ -340,14 +341,16 @@ button {
   min-width: var(--w-tree-min);
   max-width: var(--w-tree-max);
   flex: none;
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border-default);
+  /* 跟主内容同色,分界靠右边缘的淡阴影 */
+  background: var(--bg-canvas);
+  border-right: none;
+  box-shadow: var(--edge-shadow);
   overflow: hidden;
 }
 
 .tree__search {
-  padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: none;
 }
 
 .tree__search input {
@@ -549,8 +552,8 @@ button {
   display: flex;
   align-items: stretch;
   height: var(--h-tabbar);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  border-bottom: none;
   flex: none;
 }
 
@@ -666,8 +669,8 @@ button {
   gap: var(--sp-4);
   height: var(--header-h);
   padding: 0 var(--sp-4);
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+  border-bottom: none;
   flex: none;
 }
 
@@ -1088,8 +1091,8 @@ button {
   align-items: center;
   gap: var(--sp-5);
   padding: 0 var(--sp-4);
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-default);
+  background: var(--bg-canvas);
+  border-top: none;
   font-size: var(--fs-xs);
   color: var(--fg-muted);
 }
@@ -1139,9 +1142,8 @@ button {
   min-width: 180px;
   padding: var(--sp-2) 0;
   background: var(--bg-raised);
-  border: 1px solid var(--border-default);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--card-shadow);
   animation: menu-in var(--dur-fast) var(--ease-out);
 }
 
@@ -1530,9 +1532,8 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--bg-raised);
-  border: 1px solid var(--border-default);
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   animation: palette-in var(--dur-base) var(--ease-out);
 }
@@ -1875,9 +1876,8 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--bg-raised);
-  border: 1px solid var(--border-default);
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
   animation: palette-in var(--dur-base) var(--ease-out);
 }
@@ -1953,8 +1953,7 @@ button {
   max-width: 92vw;
   height: 100%;
   background: var(--bg-raised);
-  border-left: 1px solid var(--border-default);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--card-shadow);
   animation: drawer-in var(--dur-base) var(--ease-out);
 }
 
@@ -2009,9 +2008,8 @@ button {
   max-width: 380px;
   padding: var(--sp-3) var(--sp-4);
   background: var(--bg-raised);
-  border: 1px solid var(--border-default);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--card-shadow);
   font-size: var(--fs-sm);
   color: var(--fg-default);
   pointer-events: auto;
