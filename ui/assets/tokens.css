@@ -72,29 +72,35 @@
     0 0 16px -2px rgba(0, 0, 0, 0.16),
     0 0 4px rgba(0, 0, 0, 0.05);
 
-  /* 前景 */
+  /* 前景三级:default 是正文,muted 是要读的次要信息,subtle 只给图标。
+     浅色端的背景是灰不是白(画布 #ffffff / 面板 #f6f8fa / 次级面 #f1f3f5 /
+     内嵌块 #e9edf1 / 选中 #e2e6eb),比值要比白底再低一档才够 4.5。
+     muted 取 #66666a —— 这是能让最暗的底(--bg-selected)也过 4.5 的值;
+     subtle 取 #838387,只保证 3:1,给图标与纯装饰。 */
   --fg-default: #1c1c1e;
-  --fg-muted: #6e6e73;
-  --fg-subtle: #a1a1a6;
-  --fg-disabled: #c7c7cc;
+  --fg-muted: #66666a;
+  --fg-subtle: #838387;
   --fg-inverse: #ffffff;
 
   /* 强调色:取自 MCode 的主蓝 rgb(2,119,217) */
-  --accent: #0277d9;
-  --accent-hover: #0369c1;
+  --accent: #026ec9;
+  --accent-hover: #0263ba;
   --accent-active: #025aab;
+  /* accent 当文字用时的色号。浅色与 --accent 同值(两边都够 4.5),
+     深色要更亮 —— 深色主题的 accent 是按钮填充色(配白字),当文字只有 3.7:1。 */
+  --accent-text: #026ec9;
   --accent-soft: #e6f2fd;
   --accent-border: #a8d1f5;
   --accent-fg: #ffffff;
 
   /* 语义色 */
-  --danger: #d33b3b;
+  --danger: #ce2e2e;
   --danger-soft: #fdecec;
   --danger-border: #f0bcbc;
-  --warning: #c07c14;
+  --warning: #9c6510;
   --warning-soft: #fdf4e3;
   --warning-border: #ecd3a1;
-  --success: #1f9254;
+  --success: #1b7f49;
   --success-soft: #e7f6ee;
   --success-border: #a9dcc2;
   --info: #1673a3;
@@ -155,12 +161,15 @@ body[data-theme="dark"] {
 
   --fg-default: #ededed;
   --fg-muted: #949494;
-  --fg-subtle: #666666;
-  --fg-disabled: #4a4a4a;
+  /* 深色端同理:subtle 只保证 3:1(给图标),要读的文字用 muted */
+  --fg-subtle: #747478;
 
   --accent: #0277d9;
   --accent-hover: #1a86e6;
   --accent-active: #3d97ea;
+  /* 深色主题的 accent 是按钮填充色(配白字 4.5:1),当文字只有 3.7:1,
+     所以文字另取一支更亮的蓝。 */
+  --accent-text: #098efd;
   --accent-soft: #12283a;
   --accent-border: #1d4c73;
   --accent-fg: #ffffff;
@@ -275,7 +284,9 @@ body[data-theme="dark"] {
   --engine-mysql: #00758f;
   --engine-sqlite: #003b57;
   --engine-sqlserver: #a4262c;
-  --engine-mongodb: #13aa52;
+  /* MongoDB 浅色用官方深绿 #00684A(浅底上的标准用法),不是旧版的浅绿
+     #13aa52 —— 后者在灰底上只有 2.86:1,图标达不到 3:1 的非文本对比度。 */
+  --engine-mongodb: #00684a;
   --engine-redis: #d82c20;
 }
 

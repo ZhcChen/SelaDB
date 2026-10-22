@@ -30,7 +30,7 @@
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
   margin-bottom: var(--sp-3);
 }
 
@@ -154,7 +154,7 @@
   margin-top: auto;
   padding-top: var(--sp-4);
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
 }
 
@@ -180,7 +180,7 @@
 }
 
 .entry__card:hover .entry__card-arrow {
-  color: var(--accent);
+  color: var(--accent-text);
   transform: translateX(2px);
 }
 
@@ -247,7 +247,7 @@
 
 .engine-icon-cell__shape {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   margin-top: 2px;
 }
 
@@ -267,7 +267,7 @@
 
 .swatch__value {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
   margin-top: 2px;
 }
@@ -358,7 +358,7 @@
   align-items: center;
   gap: var(--sp-3);
   font-size: var(--fs-sm);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .wizard__step-num {
@@ -386,7 +386,7 @@
 .wizard__step.is-done .wizard__step-num {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .wizard__step-sep {
@@ -432,7 +432,7 @@
 
 .engine-card__meta {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   margin-top: 2px;
 }
 
@@ -770,7 +770,7 @@
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   text-transform: uppercase;
   margin-bottom: var(--sp-4);
 }
@@ -813,7 +813,7 @@
   flex: none;
   border-radius: var(--r-md);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .start__text {
@@ -839,7 +839,7 @@
   flex: none;
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .start__recent {
@@ -850,7 +850,7 @@
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   text-transform: uppercase;
   margin-bottom: var(--sp-3);
 }

@@ -883,6 +883,8 @@ function caretIcon() {
   const span = document.createElement("span");
   span.className = "btn__caret";
   span.textContent = "▾";
+  // 装饰性字形:对读屏隐藏,对比度按非文本标准(3:1)算
+  span.setAttribute("aria-hidden", "true");
   return span;
 }
 

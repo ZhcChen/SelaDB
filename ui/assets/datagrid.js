@@ -46,6 +46,25 @@ function typeClassOf(type) {
   return "grid__cell--string";
 }
 
+/**
+ * 给单元格写文字。
+ *
+ * 文字要包一层 span:单元格是 `display: flex`,而 `text-overflow: ellipsis`
+ * 只对「直接含文本的块级元素」生效 —— 放在 flex 容器上永远不触发,
+ * 结果就是长文本被 `overflow: hidden` 硬切,连省略号都没有。
+ * 省略号要画在 span 上,span 得能收缩(min-width: 0)。
+ */
+function setCellText(cell, text) {
+  let span = cell.firstElementChild;
+  if (!span || !span.classList.contains("grid__cell-text")) {
+    cell.replaceChildren();
+    span = document.createElement("span");
+    span.className = "grid__cell-text";
+    cell.appendChild(span);
+  }
+  span.textContent = text;
+}
+
 /* -----------------------------------------------------------------------------
  * 过滤表达式
  *
@@ -619,7 +638,7 @@ class DataGrid {
       if (column.pk) cell.classList.add("grid__cell--pk");
 
       if (!source) {
-        cell.textContent = "";
+        setCellText(cell, "");
         continue;
       }
       // 列可以自带 format,用来做「语义化」的显示:Redis 的类型徽章、
@@ -636,7 +655,7 @@ class DataGrid {
             badge.textContent = formatted.text ?? "";
             cell.appendChild(badge);
           } else {
-            cell.textContent = formatted.text ?? "";
+            setCellText(cell, formatted.text ?? "");
             if (formatted.className) {
               for (const token of formatted.className.split(/\s+/).filter(Boolean)) {
                 cell.classList.add(token);
@@ -644,16 +663,16 @@ class DataGrid {
             }
           }
         } else {
-          cell.textContent = formatted ?? "";
+          setCellText(cell, formatted ?? "");
         }
         continue;
       }
 
       if (value === null || value === undefined) {
-        cell.textContent = "NULL";
+        setCellText(cell, "NULL");
         cell.classList.add("grid__cell--null");
       } else {
-        cell.textContent = String(value);
+        setCellText(cell, String(value));
         // true 与 false 语义相反,不能是同一个绿
         if (typeof value === "boolean" && value === false) {
           cell.classList.add("grid__cell--bool-false");

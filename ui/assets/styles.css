@@ -192,7 +192,7 @@ button {
 }
 
 .btn.btn--tool[disabled] {
-  color: var(--fg-disabled);
+  color: var(--fg-muted);
 }
 
 /* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框。
@@ -221,7 +221,7 @@ button {
 }
 
 .topbar__search input::placeholder {
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .topbar__search:hover input {
@@ -281,10 +281,21 @@ button {
   background: var(--bg-active);
 }
 
+/* 禁用态:仍然要看得见。
+   原来用 --fg-disabled,在浅色底上只有 1.5:1,在强调色底上 2.0:1 —— 那已经不是
+   「淡一点」而是「读不出来」,用户分不清是禁用还是渲染坏了。改用 --fg-muted
+   (4.5+ 可读),禁用感靠「没有 hover 效果 + 没有强调色底」来表达。 */
 .btn[disabled] {
-  color: var(--fg-disabled);
+  color: var(--fg-muted);
   border-color: var(--border-subtle);
   cursor: not-allowed;
+}
+
+/* 禁用的主按钮退成灰块 —— 文字要是直接用 --fg-muted 压在强调色上,
+   两种蓝在深浅主题里都不是一个数量级的对比。 */
+.btn--primary[disabled] {
+  background: var(--bg-inset);
+  border-color: transparent;
 }
 
 .btn--primary {
@@ -402,7 +413,7 @@ button {
 }
 
 .tree__search input::placeholder {
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .tree__search input:hover {
@@ -626,7 +637,7 @@ button {
 
 .splitter:hover .splitter__grip,
 .splitter.is-dragging .splitter__grip {
-  color: var(--accent);
+  color: var(--accent-text);
   opacity: 1;
 }
 
@@ -665,7 +676,7 @@ button {
 }
 
 .btn--commit .icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* -----------------------------------------------------------------------------
@@ -827,7 +838,7 @@ button {
 
 .panel__sub {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
 }
 
@@ -1006,9 +1017,23 @@ button {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
   font-size: var(--fs-base);
   color: var(--fg-default);
+}
+
+/*
+ * 省略号要画在这一层,不能画在 .grid__cell 上。
+ *
+ * `text-overflow: ellipsis` 只对「直接含文本的块级元素」生效;单元格是
+ * `display: flex`,文字在匿名 flex item 里,把 ellipsis 写在单元格上永远
+ * 不触发 —— 结果就是长文本被 overflow:hidden 硬切,连「还有更多」的提示
+ * 都没有。span 要能收缩(min-width: 0),否则它撑开单元格,一样不截断。
+ */
+.grid__cell-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid__cell--rowno {
@@ -1019,7 +1044,7 @@ button {
   flex: none;
   justify-content: flex-end;
   padding-right: var(--sp-3);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -1098,7 +1123,7 @@ button {
   flex: none;
   width: 10px;
   font-size: 8px;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .grid__col-resize {
@@ -1322,7 +1347,7 @@ button {
 }
 
 .menu__item[disabled] {
-  color: var(--fg-disabled);
+  color: var(--fg-muted);
   cursor: not-allowed;
 }
 
@@ -1333,7 +1358,7 @@ button {
 .menu__shortcut {
   margin-left: auto;
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
 }
 
@@ -1376,13 +1401,13 @@ button {
 }
 
 .input::placeholder {
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .input:disabled,
 .select:disabled {
   background: var(--bg-inset);
-  color: var(--fg-disabled);
+  color: var(--fg-muted);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1394,7 +1419,7 @@ button {
   place-content: center;
   justify-items: center;
   gap: var(--sp-4);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   text-align: center;
   padding: var(--sp-9);
 }
@@ -1421,6 +1446,14 @@ button {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
+  /* 文字用前景色,品牌色只留给图标 ——
+     引擎名本来就带品牌色,再染一遍是同一信息编码两次,而且品牌色当文字
+     并不达标(MongoDB 绿在浅灰底上只有 2.86:1)。跟对象树里的连接节点
+     保持一致:图标带色、文字中性。 */
+  color: var(--fg-default);
+}
+
+.engine-badge .icon--engine {
   color: var(--engine-color, var(--fg-muted));
 }
 
@@ -1485,7 +1518,7 @@ button {
   height: var(--lh-code);
   padding-right: var(--sp-3);
   text-align: right;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -1705,7 +1738,7 @@ button {
 }
 
 .palette__input::placeholder {
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .palette__list {
@@ -1720,7 +1753,7 @@ button {
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .palette__item {
@@ -1761,7 +1794,7 @@ button {
 
 .palette__item-subtitle {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
@@ -1771,20 +1804,20 @@ button {
 .palette__item-shortcut {
   flex: none;
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-family: var(--font-mono);
 }
 
 .palette__item mark {
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: var(--fw-semibold);
 }
 
 .palette__empty {
   padding: var(--sp-7) var(--sp-5);
   text-align: center;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-sm);
 }
 
@@ -1843,11 +1876,11 @@ button {
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 .subtab.is-active .subtab__count {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* 结构表格 */
@@ -1949,7 +1982,7 @@ button {
 .struct-empty {
   padding: var(--sp-8) var(--sp-5);
   text-align: center;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-sm);
 }
 
@@ -2209,7 +2242,7 @@ button {
 
 .field__hint {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   line-height: var(--lh-loose);
 }
 
@@ -2383,7 +2416,7 @@ button {
 .value-editor__row-label {
   width: 48px;
   flex: none;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-xs);
 }
 
@@ -2506,7 +2539,7 @@ button {
 .value-editor__empty {
   padding: var(--sp-6);
   text-align: center;
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   font-size: var(--fs-sm);
   border: 1px dashed var(--border-default);
   border-radius: var(--r-md);
@@ -2522,7 +2555,7 @@ button {
 
 .value-editor__hint {
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
 }
 
 /* 抽屉内的内容容器与弹性占位 */
@@ -2568,7 +2601,7 @@ button {
 }
 
 .subtab.is-active .subtab__icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .struct-ddl__title {
@@ -2621,53 +2654,33 @@ button {
 }
 
 .grid__badge--string {
-  color: #15803d;
+  color: var(--type-bool);
   background: var(--success-soft);
   border-color: var(--success-border);
 }
 
 .grid__badge--hash {
-  color: #1f6feb;
+  color: var(--type-int);
   background: var(--accent-soft);
   border-color: var(--accent-border);
 }
 
 .grid__badge--list {
-  color: #c2410c;
+  color: var(--type-binary);
   background: var(--warning-soft);
   border-color: var(--warning-border);
 }
 
 .grid__badge--set {
-  color: #8250df;
+  color: var(--type-time);
   background: var(--warning-soft);
   border-color: var(--warning-border);
 }
 
 .grid__badge--zset {
-  color: #be185d;
+  color: var(--type-json);
   background: var(--danger-soft);
   border-color: var(--danger-border);
-}
-
-body[data-theme="dark"] .grid__badge--string {
-  color: #4ade80;
-}
-
-body[data-theme="dark"] .grid__badge--hash {
-  color: #79b8ff;
-}
-
-body[data-theme="dark"] .grid__badge--list {
-  color: #ffa657;
-}
-
-body[data-theme="dark"] .grid__badge--set {
-  color: #d2a8ff;
-}
-
-body[data-theme="dark"] .grid__badge--zset {
-  color: #f9a8d4;
 }
 
 /* 弱化但可读的值 —— ∞ 这类 */
@@ -2737,7 +2750,7 @@ body[data-theme="dark"] .grid__badge--zset {
   font-family: var(--font-code);
   font-size: var(--fs-xs);
   line-height: var(--lh-code);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   user-select: none;
 }
 
