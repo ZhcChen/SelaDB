@@ -87,6 +87,41 @@ const iconColors = await page.evaluate(() => {
 });
 check("引擎图标各自带品牌色", new Set(iconColors).size > 1, `实际 ${new Set(iconColors).size} 种颜色`);
 
+// 外壳是上中下三段:顶栏与底栏整条跟侧栏同色,与中间区之间没有分割线
+const shellLines = await page.evaluate(() => {
+  const read = (sel, prop) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    return { border: cs[prop], bg: cs.backgroundColor, img: cs.backgroundImage };
+  };
+  return { top: read(".topbar", "borderBottomWidth"), bottom: read(".statusbar", "borderTopWidth") };
+});
+check("顶栏与中间区之间没有分割线", shellLines.top?.border === "0px", `border-bottom ${shellLines.top?.border}`);
+check("底栏与中间区之间没有分割线", shellLines.bottom?.border === "0px", `border-top ${shellLines.bottom?.border}`);
+check(
+  "顶栏与底栏整条跟侧栏同色",
+  shellLines.top?.bg === shellLines.bottom?.bg,
+  `${shellLines.top?.bg} / ${shellLines.bottom?.bg}`,
+);
+
+// 拖动分隔条,侧栏宽度要跟着变
+const treeBefore = await page.locator(".tree").evaluate((el) => el.getBoundingClientRect().width);
+const splitter = page.locator(".splitter");
+if (await splitter.count()) {
+  const box = await splitter.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + 300, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+}
+const treeAfter = await page.locator(".tree").evaluate((el) => el.getBoundingClientRect().width);
+check("拖动分隔条能改变侧栏宽度", treeAfter > treeBefore + 30, `${treeBefore} -> ${treeAfter}`);
+await page.locator(".tree").evaluate((el) => {
+  el.style.width = "";
+});
+
 await shot(page, "01-workbench-light");
 
 // ---- 展开并打开表 ----

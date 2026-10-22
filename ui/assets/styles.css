@@ -110,8 +110,6 @@ button {
   grid-template-rows: var(--h-topbar) 1fr var(--h-statusbar);
   height: 100vh;
   overflow: hidden;
-  /* 侧栏宽度,顶栏与状态栏的渐变分界靠它 */
-  --tree-w: var(--w-tree);
 }
 
 .app__body {
@@ -127,10 +125,15 @@ button {
  * 占了 40px 纵向空间。合并成一行后,把纵向空间还给数据网格。
  * -------------------------------------------------------------------------- */
 /*
- * 顶栏左段跟侧栏同色、右段跟主内容同色 —— 侧栏于是是一整条连续的列,
- * 而不是「从顶栏下面才开始」的一截。--tree-w 由分隔条拖动时更新。
+ * 外壳是上中下三段:顶栏 / 工作区(侧栏 + 主内容) / 底栏。
  *
- * 底边是浅灰分割线,这是需要的:顶栏跟下面的内容区必须断开。
+ * 顶栏与底栏整条用侧栏的底色,与中间区之间**不画分割线** —— 三段的边界
+ * 全靠底色分:顶栏、侧栏、底栏连成一条浅灰的带,主内容区是留白的画布嵌在
+ * 右侧。这是桌面工具的惯例(VS Code 浅色主题:标题栏/侧边栏/状态栏同色,
+ * 编辑区留白,彼此无线),比「顶栏底栏各压一条横贯的线」干净:
+ * 那条线会把侧栏从中间切断,侧栏就不再是一条贯通的列。
+ *
+ * 侧栏是浅灰、主内容是白,两者的边界同样靠底色差,不需要竖线。
  */
 .topbar {
   display: flex;
@@ -138,12 +141,7 @@ button {
   gap: var(--sp-2);
   height: var(--h-topbar);
   padding: 0 var(--sp-4);
-  background: linear-gradient(
-    90deg,
-    var(--bg-surface) 0 var(--tree-w),
-    var(--bg-canvas) var(--tree-w)
-  );
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
 }
 
 .topbar__brand {
@@ -211,7 +209,9 @@ button {
   color: var(--fg-disabled);
 }
 
-/* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框 */
+/* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框。
+   顶栏与侧栏同色,输入框不能用 --bg-inset(只比顶栏深三个色阶,等于看不见),
+   改用画布色 —— 浅灰顶栏上的一块白,是桌面工具搜索框的常规样子。 */
 .topbar__search {
   position: relative;
   width: 180px;
@@ -223,7 +223,7 @@ button {
   height: 26px;
   padding: 0 var(--sp-6) 0 var(--sp-4);
   font-size: var(--fs-sm);
-  background: var(--bg-inset);
+  background: var(--bg-canvas);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--fg-default);
@@ -234,13 +234,13 @@ button {
 }
 
 .topbar__search:hover input {
-  background: var(--bg-surface);
+  background: var(--bg-canvas);
   border-color: var(--border-default);
 }
 
 .topbar__search input:focus {
   outline: none;
-  background: var(--bg-surface);
+  background: var(--bg-canvas);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -1099,12 +1099,7 @@ button {
   align-items: center;
   gap: var(--sp-5);
   padding: 0 var(--sp-4);
-  background: linear-gradient(
-    90deg,
-    var(--bg-surface) 0 var(--tree-w),
-    var(--bg-canvas) var(--tree-w)
-  );
-  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
   font-size: var(--fs-xs);
   color: var(--fg-muted);
 }
