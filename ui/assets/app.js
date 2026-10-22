@@ -813,36 +813,38 @@ function buildTopbar() {
   // 图标组
   const icons = document.createElement("div");
   icons.className = "topbar__icons";
-  icons.appendChild(
-    button("", {
-      className: "btn btn--tool btn--icon",
-      icon: "sun",
-      title: "切换主题",
-      onClick: () => {
-        const order = ["system", "light", "dark"];
-        applyTheme(order[(order.indexOf(state.theme) + 1) % order.length]);
-        syncSettingsControls();
-      },
-    }),
-  );
+
+  // 主题:点开直接选「浅色 / 深色 / 跟随系统」,不用循环切换去猜
+  const themeBtn = button("", {
+    className: "btn btn--tool btn--icon",
+    icon: themeIcon(state.theme),
+    title: `主题:${THEME_LABEL[state.theme]}`,
+  });
+  themeBtn.dataset.role = "theme-button";
+  themeBtn.addEventListener("click", (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    openMenu(
+      Object.entries(THEME_LABEL).map(([value, label]) => ({
+        label,
+        checked: state.theme === value,
+        action: () => {
+          applyTheme(value);
+          syncSettingsControls();
+        },
+      })),
+      { x: rect.left, y: rect.bottom + 4 },
+    );
+  });
+  icons.appendChild(themeBtn);
+
   icons.appendChild(
     button("", {
       className: "btn btn--tool btn--icon",
       icon: "columns",
-      title: "切换密度",
+      title: `密度:${DENSITY_LABEL[state.density]}`,
       onClick: () => {
         applyDensity(state.density === "compact" ? "comfortable" : "compact");
         syncSettingsControls();
-      },
-    }),
-  );
-  icons.appendChild(
-    button("", {
-      className: "btn btn--tool btn--icon",
-      icon: "settings",
-      title: "设置",
-      onClick: () => {
-        location.hash = "#/settings";
       },
     }),
   );
@@ -859,7 +861,30 @@ function buildTopbar() {
   );
   bar.appendChild(icons);
 
+  // 设置:带文字的按钮。低频但必须能被找到 —— 之前只有一个齿轮图标,
+  // 谁也不会知道点它能改主题。
+  bar.appendChild(
+    button("设置", {
+      className: "btn btn--tool",
+      title: "设置",
+      onClick: () => {
+        location.hash = "#/settings";
+      },
+    }),
+  );
+
   return bar;
+}
+
+/** 主题选项的显示名。 */
+const THEME_LABEL = { system: "跟随系统", light: "浅色", dark: "深色" };
+const DENSITY_LABEL = { comfortable: "舒适", compact: "紧凑" };
+
+/** 主题按钮的图标:跟随系统用显示器,浅色用太阳,深色用月亮。 */
+function themeIcon(preference) {
+  if (preference === "light") return "sun";
+  if (preference === "dark") return "moon";
+  return "monitor";
 }
 
 /** 顶栏里的竖向分隔线。 */

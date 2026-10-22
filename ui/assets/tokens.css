@@ -15,38 +15,45 @@
  * -------------------------------------------------------------------------- */
 :root {
   /* 背景层级:canvas 最底,surface 是面板,raised 是浮层,sunken 是凹陷区 */
-  /* 背景要分三层才有层次:canvas 最沉,surface 是面板,sunken 是凹陷区。
-     之前 canvas 与 surface 只差一点点,面板之间只靠 1px 线分隔,看着平。 */
-  --bg-canvas: #eaedf2;
-  --bg-surface: #ffffff;
+  /*
+   * 中性灰,一点蓝调都不要。
+   *
+   * 之前用带蓝的灰(#eaedf2 / #e2e6ed),整个界面泛着一层冷蓝,
+   * 看着像「网页后台」而不是桌面工具。MCode 那一套是纯 R=G=B 的中性灰。
+   *
+   * 层次靠三档背景:内容区最亮,侧栏略暗,浮层卡片最亮(有边框托着)。
+   */
+  --bg-canvas: #ffffff;
+  --bg-surface: #f6f6f7;
   --bg-raised: #ffffff;
-  --bg-sunken: #e2e6ed;
-  --bg-inset: #f4f6f9;
-  --bg-hover: rgba(16, 24, 40, 0.045);
-  --bg-active: rgba(47, 95, 224, 0.1);
-  --bg-selected: #e4edff;
-  --bg-overlay: rgba(16, 24, 40, 0.32);
+  --bg-sunken: #ededee;
+  --bg-inset: #f0f0f1;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-active: rgba(2, 119, 217, 0.1);
+  /* 选中态是中性药丸,不染色 */
+  --bg-selected: #e4e4e6;
+  --bg-overlay: rgba(0, 0, 0, 0.32);
 
-  /* 边框 */
-  --border-subtle: #e6e9ef;
-  --border-default: #d5dae3;
-  --border-strong: #b8c0cd;
+  /* 分割线要淡到「几乎看不见但确实在」 */
+  --border-subtle: #ebebed;
+  --border-default: #d9d9dd;
+  --border-strong: #c2c2c7;
   --border-focus: var(--accent);
 
   /* 前景 */
-  --fg-default: #1c2230;
-  --fg-muted: #5f6b7d;
-  --fg-subtle: #8b95a6;
-  --fg-disabled: #b3bac6;
+  --fg-default: #1c1c1e;
+  --fg-muted: #6e6e73;
+  --fg-subtle: #a1a1a6;
+  --fg-disabled: #c7c7cc;
   --fg-inverse: #ffffff;
 
-  /* 强调色 */
-  --accent: #2f5fe0;
-  --accent-hover: #2450c8;
-  --accent-active: #1c43a8;
-  --accent-soft: #e8efff;
-  --accent-border: #b6c8f5;
-  --accent-fg: var(--fg-inverse);
+  /* 强调色:取自 MCode 的主蓝 rgb(2,119,217) */
+  --accent: #0277d9;
+  --accent-hover: #0369c1;
+  --accent-active: #025aab;
+  --accent-soft: #e6f2fd;
+  --accent-border: #a8d1f5;
+  --accent-fg: #ffffff;
 
   /* 语义色 */
   --danger: #d33b3b;
@@ -67,7 +74,7 @@
   --grid-row-bg: #ffffff;
   --grid-row-bg-alt: #f7f8fa;
   --grid-row-bg-hover: #eef0f4;
-  --grid-row-bg-selected: #e4edff;
+  --grid-row-bg-selected: #dbeafe;
   --grid-cell-editing: #ffffff;
   --grid-header-bg: #f7f8fa;
   --grid-header-fg: var(--fg-muted);
@@ -82,32 +89,38 @@
  * 2. 语义色板 —— 深色
  * -------------------------------------------------------------------------- */
 body[data-theme="dark"] {
-  --bg-canvas: #090c12;
-  --bg-surface: #151b24;
-  --bg-raised: #1d2430;
-  --bg-sunken: #070a0f;
-  --bg-inset: #10151d;
-  --bg-hover: rgba(255, 255, 255, 0.055);
-  --bg-active: rgba(91, 140, 255, 0.18);
-  --bg-selected: #1c2b4d;
-  --bg-overlay: rgba(0, 0, 0, 0.55);
+  /*
+   * MCode 的深色配色,色值直接从截图上采的:
+   *   内容区 rgb(28,28,28) · 侧栏 rgb(23,23,23) · 浮层卡片 rgb(38,38,38)
+   *   主文字 rgb(237,237,237) · 次文字 rgb(148,148,148) · 更淡 rgb(102,102,102)
+   * 全部是中性灰,没有任何蓝调。
+   */
+  --bg-canvas: #1c1c1c;
+  --bg-surface: #171717;
+  --bg-raised: #262626;
+  --bg-sunken: #121212;
+  --bg-inset: #202020;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(2, 119, 217, 0.2);
+  /* 选中态是中性药丸,不染色 */
+  --bg-selected: #2c2c2c;
+  --bg-overlay: rgba(0, 0, 0, 0.6);
 
-  --border-subtle: #1e2530;
-  --border-default: #2a323f;
-  --border-strong: #3d4757;
+  --border-subtle: #242424;
+  --border-default: #303030;
+  --border-strong: #454545;
 
-  --fg-default: #dde3ec;
-  --fg-muted: #949eb0;
-  --fg-subtle: #69737f;
-  --fg-disabled: #4b5462;
+  --fg-default: #ededed;
+  --fg-muted: #949494;
+  --fg-subtle: #666666;
+  --fg-disabled: #4a4a4a;
 
-  --accent: #5b8cff;
-  --accent-hover: #7aa2ff;
-  --accent-active: #9bb8ff;
-  --accent-soft: #16233d;
-  --accent-border: #2f4a80;
-  /* 深色下的强调色偏亮,主按钮改用深色文字,白字对比度不够 */
-  --accent-fg: #0b1220;
+  --accent: #0277d9;
+  --accent-hover: #1a86e6;
+  --accent-active: #3d97ea;
+  --accent-soft: #12283a;
+  --accent-border: #1d4c73;
+  --accent-fg: #ffffff;
 
   --danger: #ef6a6a;
   --danger-soft: #2a1618;
@@ -125,7 +138,7 @@ body[data-theme="dark"] {
   --grid-row-bg: #151b24;
   --grid-row-bg-alt: #191f29;
   --grid-row-bg-hover: #1e242f;
-  --grid-row-bg-selected: #1c2b4d;
+  --grid-row-bg-selected: #1e3247;
   --grid-cell-editing: #10151d;
   --grid-header-bg: #1a212b;
   --grid-null-fg: #8b95a6;
@@ -282,11 +295,13 @@ body[data-theme="dark"] {
   --sp-8: 24px;
   --sp-9: 32px;
 
-  --r-xs: 2px;
-  --r-sm: 3px;
-  --r-md: 4px;
-  --r-lg: 6px;
-  --r-xl: 8px;
+  /* 圆角整体放大:卡片化的浮层要靠圆角托住,3–6px 太锐利 */
+  --r-xs: 3px;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-2xl: 16px;
   --r-full: 999px;
 
   --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
@@ -296,10 +311,11 @@ body[data-theme="dark"] {
 }
 
 body[data-theme="dark"] {
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+  /* 中性底上用带蓝的黑阴影会显脏,改成纯黑柔光 */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.45);
 }
 
 /* -----------------------------------------------------------------------------

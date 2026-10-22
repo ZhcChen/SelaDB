@@ -550,7 +550,7 @@ button {
   align-items: stretch;
   height: var(--h-tabbar);
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-subtle);
   flex: none;
 }
 

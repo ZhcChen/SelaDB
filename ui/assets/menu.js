@@ -46,6 +46,14 @@ function openMenu(items, { x, y } = {}) {
     if (item.danger) button.classList.add("menu__item--danger");
     if (item.disabled) button.disabled = true;
 
+    // 勾选标记:单选类菜单(主题切换)要能看出当前选中哪一项
+    if (item.checked) {
+      const mark = document.createElement("span");
+      mark.className = "menu__check";
+      mark.textContent = "✓";
+      button.appendChild(mark);
+    }
+
     const label = document.createElement("span");
     label.textContent = item.label;
     button.appendChild(label);

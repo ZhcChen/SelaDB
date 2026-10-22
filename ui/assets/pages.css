@@ -744,14 +744,15 @@
   gap: var(--sp-3);
 }
 
+/* 浮层卡片:比画布更亮 + 1px 边框 + 圆角,靠边界立住 */
 .start__card {
   display: flex;
   align-items: flex-start;
   gap: var(--sp-4);
   padding: var(--sp-4);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-xl);
   text-align: left;
   transition: border-color var(--dur-fast) var(--ease-out),
     background var(--dur-fast) var(--ease-out);
@@ -765,10 +766,10 @@
 .start__icon {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   flex: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: var(--accent-soft);
   color: var(--accent);
 }
