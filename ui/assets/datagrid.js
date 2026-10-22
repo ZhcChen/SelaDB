@@ -217,7 +217,7 @@ class DataGrid {
     const input = document.createElement("input");
     input.className = "grid__filter-input";
     input.type = "text";
-    input.placeholder = "过滤条件,例如 id > 100";
+    input.placeholder = this.config.filterPlaceholder ?? "过滤条件,例如 id > 100";
     input.setAttribute("aria-label", "过滤条件");
     const clear = document.createElement("button");
     clear.className = "grid__filter-clear";

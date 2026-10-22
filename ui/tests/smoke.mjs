@@ -11,7 +11,7 @@
  * 截图落在 tests/screenshots/ 下,用来做视觉回归的基准。
  */
 
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -37,6 +37,20 @@ function check(name, ok, detail = "") {
 async function shot(page, name) {
   await page.screenshot({ path: join(shotDir, `${name}.png`) });
 }
+
+// ---- 静态约束:设计源不用 ES module,普通脚本里出现 import/export 是语法错误 ----
+const assetsDir = join(here, "..", "assets");
+const assetFiles = (await readdir(assetsDir)).filter((name) => name.endsWith(".js"));
+const moduleSyntax = [];
+for (const name of assetFiles) {
+  const source = await readFile(join(assetsDir, name), "utf8");
+  if (/^\s*(import|export)\s/m.test(source)) moduleSyntax.push(name);
+}
+check(
+  "assets/ 里没有 ES module 语法(file:// 下会被 CORS 拦住)",
+  moduleSyntax.length === 0,
+  moduleSyntax.join(", "),
+);
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

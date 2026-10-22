@@ -53,6 +53,7 @@ docs/                   架构文档与 ADR
 - `tokens.css` 是唯一设计源，组件样式里不出现裸色值与裸尺寸。
 - 改动设计源后跑 `cd ui && bun run test:smoke`（直接跑 `file://` 协议，不需要先起服务器），截图落在 `ui/tests/screenshots/` 作为视觉回归基准。
 - **改了视觉还要过视觉评审**：`cd ui && node tests/review.mjs` 会把黄金截图交给多模态模型按固定 rubric 打分，输出可定位的问题清单，报告落在 `ui/tests/review-report.md`。功能断言验不了「好不好看」，这一步不能省。
+- **绝对分数有 ±1 的抖动**，只能当方向。判断改动好坏用成对比较：`cd ui && node tests/review.mjs --compare`（基线截图在 `ui/tests/baseline/`）。
 - 详见 [`ui/README.md`](ui/README.md) 与 [`docs/ui-design-plan.md`](docs/ui-design-plan.md)。
 
 ## 加新引擎时

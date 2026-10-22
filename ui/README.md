@@ -81,6 +81,17 @@ cd ui && node tests/review.mjs 02-grid  # 只评某几张
 可辨识 / 专业观感」,思路借自 [wandb/openui](https://github.com/wandb/openui)
 的 `backend/openui/eval/evaluate.py`,但 rubric 改写成了适配桌面数据库工具的版本。
 
+**绝对打分有 ±1 分的抖动**,同一批截图连评四轮总分在 8.07–8.80 之间浮动。
+所以另有一套成对比较,问「改动前后哪个更好」,相对判断稳定得多:
+
+```bash
+cd ui && node tests/review.mjs --compare
+```
+
+基线截图在 `tests/baseline/`,更新方式见 `docs/ui-design-plan.md`。
+
+评审的真正价值不是分数,是它指出的具体问题 —— 每一轮改动都是从报告里挑出来做的。
+
 借的是它的 eval 思路,不是它的产物 —— openui 生成的是 Tailwind + shadcn 代码,
 直接拿来会同时违反「零第三方 UI 依赖」「零构建步骤」「tokens.css 唯一真源」。
 

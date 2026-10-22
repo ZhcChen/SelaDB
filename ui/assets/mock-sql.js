@@ -141,6 +141,44 @@ function statementKind(statement) {
 }
 
 /**
+ * 取 SELECT 列表里的投影。
+ *
+ * 结果集的列必须跟 SQL 写的一致。上面写着 GROUP BY,下面却摊开一张明细表,
+ * 看着就不专业 —— 而且设计源要是这么画,后面 Rust 实现也会照着错。
+ *
+ * @returns {Array<{ expr: string, name: string }>}
+ */
+function parseProjections(statement) {
+  const match = statement.match(/\bselect\s+([\s\S]*?)\bfrom\b/i);
+  if (!match) return [];
+
+  return match[1]
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const alias = part.match(/\bas\s+["`]?([\w]+)["`]?$/i);
+      if (alias) {
+        return {
+          expr: part.replace(/\s+as\s+["`]?[\w]+["`]?$/i, "").trim(),
+          name: alias[1],
+        };
+      }
+      return { expr: part, name: part.split(".").pop().replace(/["`]/g, "") };
+    });
+}
+
+/** 聚合函数的合成值。 */
+function syntheticValue(expr, index) {
+  const text = String(expr ?? "").toLowerCase();
+  if (text.startsWith("count")) return 3 + (index % 5);
+  if (text.startsWith("sum") || text.startsWith("avg") || text.startsWith("total")) {
+    return 120.5 + index * 7.25;
+  }
+  return null;
+}
+
+/**
  * 执行一段 SQL(mock)。
  *
  * @param {string} sql
@@ -186,7 +224,39 @@ function executeQuery(sql, { tables }) {
 
     if (kind === "rows" && refs.length > 0) {
       const table = tables.get(refs[0].name);
-      return { kind: "rows", columns: table.columns, rows: table.rows, total: table.total };
+      const projections = parseProjections(statement.text);
+
+      if (projections.length === 0) {
+        return { kind: "rows", columns: table.columns, rows: table.rows, total: table.total };
+      }
+
+      // 按 SELECT 列表投影:命中的列取原值,聚合列合成一个数
+      const columns = projections.map((projection) => {
+        const source = table.columns.find(
+          (column) => column.name === projection.name || column.key === projection.name,
+        );
+        if (source) return { ...source, name: projection.name, key: projection.name };
+        return {
+          key: projection.name,
+          name: projection.name,
+          type: /count|sum|avg|total/i.test(projection.expr) ? "integer" : "text",
+        };
+      });
+
+      const rows = table.rows.map((row, index) => {
+        const projected = {};
+        for (const projection of projections) {
+          const source = table.columns.find(
+            (column) => column.name === projection.name || column.key === projection.name,
+          );
+          projected[projection.name] = source
+            ? row[source.key]
+            : syntheticValue(projection.expr, index);
+        }
+        return projected;
+      });
+
+      return { kind: "rows", columns, rows, total: rows.length };
     }
     if (kind === "rows") {
       // 没有 FROM 的 SELECT,比如 SELECT 1

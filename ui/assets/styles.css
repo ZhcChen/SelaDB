@@ -1700,13 +1700,14 @@ button {
   background: var(--bg-hover);
 }
 
-/* 主键行给一层很淡的底色,扫一眼就能找到主键 */
+/* 主键行给一层很淡的底色。用暖黄在蓝灰调里太跳,中性淡底更克制 ——
+   PK 徽章本身已经做了标记。 */
 .struct-table tbody tr.is-pk td {
-  background: var(--warning-soft);
+  background: var(--bg-inset);
 }
 
 .struct-table tbody tr.is-pk:hover td {
-  background: var(--warning-soft);
+  background: var(--bg-inset);
 }
 
 .struct-table .null {

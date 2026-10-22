@@ -161,8 +161,27 @@
 .entry__foot {
   margin-top: var(--sp-7);
   font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  color: var(--fg-muted);
   line-height: var(--lh-loose);
+}
+
+/* 卡片右侧的箭头 —— 给出「这是个可点进去的东西」的暗示 */
+.entry__card-arrow {
+  position: absolute;
+  right: var(--sp-5);
+  top: var(--sp-5);
+  color: var(--fg-subtle);
+  transition: transform var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.entry__card {
+  position: relative;
+}
+
+.entry__card:hover .entry__card-arrow {
+  color: var(--accent);
+  transform: translateX(2px);
 }
 
 /* -----------------------------------------------------------------------------

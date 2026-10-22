@@ -424,6 +424,8 @@ class KeyValueListView extends DataView {
         preview: previewValue(entry),
       })),
       total: keys.length,
+      // 键列表不是关系表,过滤是「按键名匹配」,写 id > 100 是 SQL 语义
+      filterPlaceholder: "按键匹配,例如 key like cache:*",
       onRowClick: (sourceIndex) => openValueEditor(keys[sourceIndex]),
     });
     this.grid.mount(body);
@@ -1296,9 +1298,10 @@ class QueryView extends DataView {
     title.className = "empty__title";
     title.textContent = "查询未执行";
     empty.appendChild(title);
+    // 错误详情已经在上方的红色条里说过了,这里不重复
     const desc = document.createElement("div");
     desc.className = "empty__desc";
-    desc.textContent = error.detail ?? error.message;
+    desc.textContent = "修正上方标红的部分后重新执行(⌘↵)";
     empty.appendChild(desc);
     this.resultHost.appendChild(empty);
   }
@@ -1559,6 +1562,10 @@ function renderEntry(root) {
   dcMeta.className = "entry__card-meta";
   dcMeta.textContent = "#/design";
   designCard.appendChild(dcMeta);
+  const dcArrow = document.createElement("span");
+  dcArrow.className = "entry__card-arrow";
+  dcArrow.appendChild(createIcon("chevron", 13));
+  designCard.appendChild(dcArrow);
   designCard.addEventListener("click", () => {
     location.hash = "#/design";
   });
@@ -1580,6 +1587,10 @@ function renderEntry(root) {
   scMeta.className = "entry__card-meta";
   scMeta.textContent = "#/spec";
   specCard.appendChild(scMeta);
+  const scArrow = document.createElement("span");
+  scArrow.className = "entry__card-arrow";
+  scArrow.appendChild(createIcon("chevron", 13));
+  specCard.appendChild(scArrow);
   specCard.addEventListener("click", () => {
     location.hash = "#/spec";
   });

@@ -284,9 +284,27 @@ interface DataView {
 ```bash
 cd ui && node tests/review.mjs              # 全部截图
 cd ui && node tests/review.mjs 02-grid      # 只评某几张
+cd ui && node tests/review.mjs --compare    # 改动前后成对比较
 ```
 
-报告落在 `ui/tests/review-report.md`。
+报告落在 `ui/tests/review-report.md`,成对比较的报告在 `ui/tests/compare-report.md`。
+
+### 绝对打分不可靠,成对比较才靠谱
+
+实测同一批截图连续评四轮,总分在 **8.07 / 8.73 / 8.80 / 8.33** 之间浮动 ——
+多模态模型每个维度有 ±1 分的抖动,总分能差 1.5 分。绝对分数只能当方向,
+不能当指标。
+
+所以工具里另有一套成对比较:把改动前后的两张图一起给模型,问「哪个更好」。
+相对判断稳定得多。基线截图放在 `ui/tests/baseline/`,更新基线的命令:
+
+```bash
+git show <基线commit>:ui/tests/screenshots/02-grid.png > ui/tests/baseline/02-grid.png
+```
+
+**评审的真正价值不是分数,是它指出的具体问题。** 每一轮改动都是从报告里
+「被反复提到的问题」和「修改建议」里挑出来做的 —— 数值列右对齐、表头分两行、
+UUID 降权、文档树紧凑化、顶栏按引擎显隐事务按钮,都是这么来的。
 
 **借的是它的 eval 思路,不是它的产物。** openui 生成的是 Tailwind + shadcn 的
 React 代码,直接拿来会同时违反「零第三方 UI 依赖」「零构建步骤」「tokens.css

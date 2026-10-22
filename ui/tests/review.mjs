@@ -15,10 +15,11 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
 
 const exec = promisify(execFile);
 
@@ -122,13 +123,94 @@ async function review(filePath, context) {
   return JSON.parse(text);
 }
 
+/**
+ * 把两张截图拼成一张对照图。
+ *
+ * 多模态工具一次只吃一张图,所以「A 和 B 哪个好」得靠拼接实现。
+ * 借用 Playwright 渲染一段 HTML 再截图,不引入图像处理库。
+ */
+async function makeComposite(beforePath, afterPath, outPath) {
+  const before = (await readFile(beforePath)).toString("base64");
+  const after = (await readFile(afterPath)).toString("base64");
+
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  await page.setContent(`<!DOCTYPE html>
+<html><body style="margin:0;background:#dfe3e9;display:flex;gap:10px;padding:10px;
+  font:600 13px/1.6 -apple-system,'PingFang SC',sans-serif;color:#1c2230">
+  <figure style="margin:0;flex:1">
+    <figcaption style="padding:4px 2px">改动前</figcaption>
+    <img src="data:image/png;base64,${before}" style="width:100%;display:block;border:1px solid #b8c0cd">
+  </figure>
+  <figure style="margin:0;flex:1">
+    <figcaption style="padding:4px 2px">改动后</figcaption>
+    <img src="data:image/png;base64,${after}" style="width:100%;display:block;border:1px solid #b8c0cd">
+  </figure>
+</body></html>`);
+  await page.screenshot({ path: outPath, fullPage: true });
+  await browser.close();
+}
+
+/**
+ * 成对比较:把改动前后的两张图一起给模型,问哪个更好。
+ *
+ * 绝对打分不可靠 —— 同一张图连续评两次,每个维度能差 1 分,总分能差 1.5。
+ * 成对比较问的是「A 和 B 哪个更好」,相对判断稳定得多。
+ *
+ * 基线截图放在 tests/baseline/:
+ *   git show <基线commit>:ui/tests/screenshots/02-grid.png > tests/baseline/02-grid.png
+ */
+async function compare(beforePath, afterPath, context) {
+  // 工具的 image_info 是「批量独立问答」,一次只给一张图,没法多图同框。
+  // 所以先用浏览器把两张图拼成一张,再问「左边和右边哪个好」。
+  const compositePath = join("/tmp", `seladb-pair-${process.pid}-${Date.now()}.png`);
+  await makeComposite(beforePath, afterPath, compositePath);
+
+  const url = await upload(compositePath);
+  const prompt = `这是一张对照图:左边是改动前,右边是改动后。界面是:
+${context}
+
+请只比较视觉与信息表达,不看功能是否实现。回答:
+1. 哪一边更好?给出 "before" 或 "after"
+2. 好在哪,差在哪(各 1–2 句)
+3. 改动后有没有引入新的问题
+
+只返回 JSON:{"better": "before"|"after", "why": "", "regression": ""}`;
+
+  const args = {
+    image_info: [{ url, mime_type: "image/png", prompt }],
+  };
+  const argsFile = join("/tmp", `seladb-cmp-${process.pid}-${Date.now()}.json`);
+  await writeFile(argsFile, JSON.stringify(args), "utf8");
+
+  const { stdout } = await exec("mcode-tools", [
+    "connector",
+    "call",
+    "connector__matrix__describe_images",
+    "--args-file",
+    argsFile,
+  ]);
+  const payload = JSON.parse(stdout);
+  const description = payload?.results?.[0]?.description ?? "";
+  const match = description.match(/```json\s*([\s\S]*?)```/);
+  return JSON.parse(match ? match[1] : description);
+}
+
 // ---- 主流程 ----
 
+const argv = process.argv.slice(2);
+const compareMode = argv.includes("--compare");
+const baselineDir = join(here, "baseline");
+const wanted = argv.filter((arg) => !arg.startsWith("--"));
 const all = (await readdir(shotDir)).filter((name) => name.endsWith(".png")).sort();
-const wanted = process.argv.slice(2);
 const targets = wanted.length
   ? all.filter((name) => wanted.some((key) => name.startsWith(key)))
   : all;
+
+if (compareMode) {
+  await runCompare(targets, baselineDir);
+  process.exit(0);
+}
 
 console.log(`待评审 ${targets.length} 张截图\n`);
 
@@ -245,3 +327,44 @@ for (const r of results) {
 
 await writeFile(reportPath, lines.join("\n"), "utf8");
 console.log(`\n报告已写入 ${reportPath}`);
+
+/** 成对比较模式。 */
+async function runCompare(targets, baselineDir) {
+  const results = [];
+  for (const name of targets) {
+    const key = name.replace(/\.png$/, "");
+    const beforePath = join(baselineDir, name);
+    const context = SCREENSHOT_CONTEXT[key] ?? "SelaDB 的一个界面截图。";
+    process.stdout.write(`  ${key} … `);
+    try {
+      const verdict = await compare(beforePath, join(shotDir, name), context);
+      console.log(verdict.better === "after" ? "改后更好" : "改前更好");
+      results.push({ key, ...verdict });
+    } catch (error) {
+      console.log(`失败: ${error.message?.split("\n")[0]}`);
+    }
+  }
+
+  const better = results.filter((r) => r.better === "after").length;
+  console.log(`\n${better}/${results.length} 张在改动后更好`);
+
+  const out = [];
+  out.push("# 改动前后成对比较");
+  out.push("");
+  out.push("> 用 `node tests/review.mjs --compare` 生成。绝对打分有 ±1 分的抖动,");
+  out.push("> 成对比较问的是「哪个更好」,相对判断稳定得多。");
+  out.push("");
+  for (const r of results) {
+    const mark = r.better === "after" ? "改后更好" : "改前更好";
+    out.push(`## ${r.key} —— ${mark}`);
+    out.push("");
+    out.push(`${r.why}`);
+    out.push("");
+    if (r.regression) {
+      out.push(`**新引入的问题**:${r.regression}`);
+      out.push("");
+    }
+  }
+  await writeFile(join(here, "compare-report.md"), out.join("\n"), "utf8");
+  console.log("报告已写入 tests/compare-report.md");
+}
