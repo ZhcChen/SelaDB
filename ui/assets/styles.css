@@ -369,17 +369,26 @@ button {
   height: 28px;
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
-  background: var(--bg-inset);
-  border: 1px solid var(--border-subtle);
+  /* 搜索框是侧栏里唯一能接收输入的元素,做成「抬起的一张面」:
+     白底 + 极轻的四周阴影,跟主内容区的卡片同一套语言。
+     原来那条 1px 边框是整个侧栏唯一的硬边元素,跟浮层的无边框规范打架。 */
+  background: var(--bg-raised);
+  border: none;
   border-radius: var(--r-md);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03),
+    0 1px 3px rgba(0, 0, 0, 0.05);
   color: var(--fg-default);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.tree__search input::placeholder {
+  color: var(--fg-subtle);
 }
 
 .tree__search input:focus {
   outline: none;
-  background: var(--bg-surface);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: var(--ring);
 }
 
 .tree__scroll {
@@ -402,18 +411,40 @@ button {
   cursor: default;
   user-select: none;
   position: relative;
+  /* 高亮走伪元素,好让它是「内缩的圆角块」而不是通栏直角条 */
+  isolation: isolate;
 }
 
-.tree__node:hover {
+/*
+ * 行的 hover / 选中 / 活动态:内缩的圆角块。
+ *
+ * 原来是通栏的直角实色条 —— 通栏元素的两端圆角悬在面板边缘像被裁掉的卡片,
+ * 直角又跟整套「无边框 + 圆角」的语言不搭。内缩成圆角块后,它和计数徽标
+ * 的胶囊、搜索框的圆角是同一套圆角语言。
+ */
+.tree__node::before {
+  content: "";
+  position: absolute;
+  inset: 1px var(--sp-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  z-index: -1;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.tree__node:hover::before {
   background: var(--bg-hover);
 }
 
-.tree__node.is-selected {
+.tree__node.is-selected::before {
   background: var(--bg-selected);
 }
 
-.tree__node.is-active {
+.tree__node.is-active::before {
   background: var(--bg-active);
+}
+
+.tree__node.is-active {
   font-weight: var(--fw-medium);
 }
 
@@ -481,7 +512,9 @@ button {
   color: var(--engine-color, var(--fg-default));
 }
 
-/* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到 */
+/* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到。
+   底色用半透明黑(叠在侧栏底上),比 --bg-inset 明显一档 ——
+   --bg-inset 和搜索框凹槽是同一个色,两个不同语义的元素撞在一起像出错了。 */
 .tree__count {
   flex: none;
   padding: 0 var(--sp-2);
@@ -492,7 +525,7 @@ button {
   font-family: var(--font-mono);
   color: var(--fg-muted);
   font-variant-numeric: tabular-nums;
-  background: var(--bg-inset);
+  background: var(--bg-hover);
   border-radius: var(--r-xs);
 }
 
