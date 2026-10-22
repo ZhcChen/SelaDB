@@ -221,13 +221,16 @@ button {
   flex: none;
 }
 
+/* 顶栏搜索框:跟侧栏搜索框同一套语言 —— 无边框,靠底色比所在区域深一档
+   做成「凹槽」。顶栏右段是 canvas 白,所以凹槽用 --bg-surface;
+   侧栏本身是 surface,凹槽就用更深的 --bg-sunken。规则一致。 */
 .topbar__search input {
   width: 100%;
   height: 26px;
   padding: 0 var(--sp-6) 0 var(--sp-4);
   font-size: var(--fs-sm);
-  background: var(--bg-canvas);
-  border: 1px solid transparent;
+  background: var(--bg-surface);
+  border: none;
   border-radius: var(--r-sm);
   color: var(--fg-default);
 }
@@ -237,15 +240,13 @@ button {
 }
 
 .topbar__search:hover input {
-  background: var(--bg-canvas);
-  border-color: var(--border-default);
+  background: var(--bg-sunken);
 }
 
 .topbar__search input:focus {
   outline: none;
-  background: var(--bg-canvas);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-raised);
+  box-shadow: var(--ring);
 }
 
 .topbar__search-hint {
@@ -610,10 +611,21 @@ button {
   opacity: 1;
 }
 
-/* 当前连接:带引擎图标,跟对象树里的连接节点呼应 */
+/* 当前连接:带引擎图标,跟对象树里的连接节点呼应。
+   它是「当前在哪个连接上」的上下文指示器,不是普通动作按钮 ——
+   Ghost 化之后它跟「提交/回滚」视觉上完全一样,层级就丢了。
+   给它一块微底色的药丸,跟动作按钮拉开。 */
 .btn--conn {
   color: var(--fg-default);
   padding-left: var(--sp-2);
+  /* 比搜索框的凹槽更重一档 —— 搜索框是浅灰的「凹」,它是深灰的「实」 */
+  background: var(--bg-selected);
+}
+
+.btn--conn:hover {
+  background: var(--border-default);
+  color: var(--fg-default);
+  border-color: transparent;
 }
 
 .topbar__conn-icon {
@@ -1748,7 +1760,8 @@ button {
   align-items: stretch;
   height: var(--h-tabbar);
   background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-default);
+  /* 下面是 canvas 白的网格区,底色差已经分界,不需要再压一条线 */
+  border-bottom: none;
   flex: none;
   padding-left: var(--sp-2);
   overflow-x: auto;
