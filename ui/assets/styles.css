@@ -522,6 +522,8 @@ button {
 /* -----------------------------------------------------------------------------
  * 6. 分栏拖拽手柄
  * -------------------------------------------------------------------------- */
+/* 拖拽手柄:一条几乎看不见的窄缝,中间放一个竖向三点握把。
+   反馈只落在握把上 —— 悬停时整条线变色会让人以为那儿是一条可点的线。 */
 .splitter {
   width: 4px;
   margin-left: -2px;
@@ -531,19 +533,34 @@ button {
   position: relative;
   z-index: var(--z-sticky);
   flex: none;
+  display: grid;
+  place-items: center;
 }
 
-.splitter::after {
+/* 握把周围扩一块透明热区,细缝本身太难点 */
+.splitter::before {
   content: "";
   position: absolute;
-  inset: 0 1px;
-  background: transparent;
-  transition: background var(--dur-fast) var(--ease-out);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 32px;
 }
 
-.splitter:hover::after,
-.splitter.is-dragging::after {
-  background: var(--accent);
+.splitter__grip {
+  width: 4px;
+  height: 18px;
+  color: var(--fg-subtle);
+  opacity: 0.55;
+  transition: color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.splitter:hover .splitter__grip,
+.splitter.is-dragging .splitter__grip {
+  color: var(--accent);
+  opacity: 1;
 }
 
 /* -----------------------------------------------------------------------------

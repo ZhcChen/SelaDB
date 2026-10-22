@@ -1520,6 +1520,27 @@ function renderWorkbench(root) {
 function buildSplitter() {
   const splitter = document.createElement("div");
   splitter.className = "splitter";
+  splitter.setAttribute("role", "separator");
+  splitter.setAttribute("aria-orientation", "vertical");
+  splitter.setAttribute("aria-label", "拖动调整对象树宽度");
+
+  // 握把:竖向三个点。整条分隔区都是热区,但视觉反馈只落在握把上 ——
+  // 悬停时整条线变色会让人以为那儿是一条可点的线,而不是一个把手。
+  const NS = "http://www.w3.org/2000/svg";
+  const grip = document.createElementNS(NS, "svg");
+  grip.setAttribute("viewBox", "0 0 4 18");
+  grip.setAttribute("width", "4");
+  grip.setAttribute("height", "18");
+  grip.setAttribute("class", "splitter__grip");
+  grip.setAttribute("aria-hidden", "true");
+  for (const cy of [4, 9, 14]) {
+    const dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("cx", "2");
+    dot.setAttribute("cy", String(cy));
+    dot.setAttribute("r", "1.1");
+    grip.appendChild(dot);
+  }
+  splitter.appendChild(grip);
 
   splitter.addEventListener("pointerdown", (event) => {
     event.preventDefault();
