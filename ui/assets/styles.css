@@ -369,17 +369,17 @@ button {
   height: 28px;
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
-  /* 搜索框是侧栏里唯一能接收输入的元素,做成「抬起的一张面」:
-     白底 + 极轻的四周阴影,跟主内容区的卡片同一套语言。
-     原来那条 1px 边框是整个侧栏唯一的硬边元素,跟浮层的无边框规范打架。 */
-  background: var(--bg-raised);
+  /* 搜索框是侧栏里唯一能接收输入的元素,做成「陷进侧栏的一个凹槽」:
+     底色比侧栏深一档,不用边框也不用阴影。
+     原来那层 1px 细影 + Y 偏移的弥散影,两头都犯规 —— 会被读成边框,
+     而且阴影往下投违反「四周对称」,干脆一层都不要。 */
+  background: var(--bg-sunken);
   border: none;
   border-radius: var(--r-md);
-  /* 只有一圈弥散影,不描边 —— 描一圈 1px 细影会被读成边框,
-     跟整套「无边框」的说法打架。白底跟侧栏浅灰的色差已经够分界。 */
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
   color: var(--fg-default);
-  transition: box-shadow var(--dur-fast) var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
 .tree__search input::placeholder {
@@ -388,6 +388,8 @@ button {
 
 .tree__search input:focus {
   outline: none;
+  /* 聚焦时从凹槽「抬起来」变成白面,焦点环用现成的 --ring(box-shadow 实现) */
+  background: var(--bg-raised);
   box-shadow: var(--ring);
 }
 
