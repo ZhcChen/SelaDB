@@ -11,4 +11,7 @@ if (!root) {
   throw new Error("缺少 #app 挂载点");
 }
 
+// 启动标志:file:// 下模块脚本被 CORS 拦下时,index.html 靠它判断要不要给出提示
+window.__seladbBooted = true;
+
 boot(root);

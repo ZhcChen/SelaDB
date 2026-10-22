@@ -48,11 +48,25 @@ ui/
 
 ```bash
 cd ui
-bun install       # vite + playwright 两个开发依赖
-bun run dev       # http://127.0.0.1:8030
-bun run build     # 产物在 dist/,base 为相对路径,可静态托管
+bun install          # vite + playwright 两个开发依赖
+bun run dev          # http://127.0.0.1:8030
+bun run build        # 产物在 dist/,含一个单文件预览版
 bun run test:smoke   # 冒烟验收,需要 dev server 已经起来
 ```
+
+### 怎么打开
+
+**直接双击 `ui/index.html` 会是空白页** —— 设计源用的是 ES 模块,浏览器在
+`file://` 协议下会用 CORS 规则拦住它加载外部 `.js`。源文件里已经放了提示,
+会告诉你下面两条路怎么走。
+
+| 方式 | 命令 | 产物 |
+|---|---|---|
+| 开发预览 | `bun run dev` → http://127.0.0.1:8030 | 改代码即刷新,支持 HMR |
+| 单文件预览 | `bun run build` → 双击 `ui/dist/SelaDB-UI-Preview.html` | 单个 232 KB 的 HTML,拷给谁都能直接打开,不需要服务器 |
+
+`bun run build` 会在 Vite 产物之后再跑一次内联(`scripts/inline.mjs`),把 CSS 与
+JS 全部塞进 HTML 里 —— 这是为了绕开上面说的 CORS 限制。
 
 ## 设计决策
 

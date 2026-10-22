@@ -12,6 +12,61 @@
     <link rel="stylesheet" href="/assets/styles.css" />
     <link rel="stylesheet" href="/assets/pages.css" />
     <title>SelaDB Design Source</title>
+    <script>
+      // file:// 下浏览器会用 CORS 规则拦住模块脚本去加载外部 .js,
+      // 表现是「页面一片空白」。这里提前拦一道,给出能真正打开的入口,
+      // 而不是让人以为设计源坏了。
+      //
+      // 注意这段必须是普通脚本:模块脚本在 file:// 下根本不会执行。
+      (function () {
+        if (location.protocol !== "file:") return;
+
+        document.addEventListener("DOMContentLoaded", function () {
+          // main.js 启动时会置位这个标志。没置位说明模块脚本被 CORS 拦下了,
+          // 页面确实没渲染出来 —— 这时才提示。
+          // 单文件产物在 file:// 下能正常跑,标志会置位,不会误报。
+          if (window.__seladbBooted) return;
+
+          var root = document.getElementById("app");
+          if (!root) return;
+
+          var box = document.createElement("div");
+          box.style.cssText =
+            "height:100vh;display:flex;flex-direction:column;align-items:center;" +
+            "justify-content:center;gap:16px;font:14px/1.6 -apple-system," +
+            "BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;" +
+            "color:#1c2230;background:#f2f4f7;padding:32px;text-align:center";
+
+          var title = document.createElement("div");
+          title.style.cssText = "font-size:20px;font-weight:600";
+          title.textContent = "这个页面需要通过 HTTP 打开";
+          box.appendChild(title);
+
+          var desc = document.createElement("div");
+          desc.style.cssText = "color:#5f6b7d;max-width:520px";
+          desc.textContent =
+            "设计源用的是 ES 模块,浏览器在 file:// 协议下会用 CORS 规则拦住它," +
+            "所以直接双击 index.html 会是空白页。两个办法:";
+          box.appendChild(desc);
+
+          var list = document.createElement("ol");
+          list.style.cssText =
+            "text-align:left;color:#5f6b7d;max-width:520px;margin:0;padding-left:24px";
+          [
+            "开发预览:在 ui/ 目录下跑 bun run dev,然后打开 http://127.0.0.1:8030",
+            "单文件预览:跑 bun run build,双击 ui/dist/SelaDB-UI-Preview.html(无需服务器)",
+          ].forEach(function (text) {
+            var item = document.createElement("li");
+            item.style.margin = "6px 0";
+            item.textContent = text;
+            list.appendChild(item);
+          });
+          box.appendChild(list);
+
+          root.replaceChildren(box);
+        });
+      })();
+    </script>
   </head>
   <body data-theme="light" data-density="comfortable">
     <div id="app" class="app-root">
