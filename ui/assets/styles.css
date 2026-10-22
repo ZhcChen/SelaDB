@@ -1490,7 +1490,7 @@ button {
 
 .palette {
   /* 副标题里有「引擎 · 层级路径」,宽度不够就会挤成两行 */
-  width: min(720px, 92vw);
+  width: min(660px, 92vw);
   max-height: 60vh;
   display: flex;
   flex-direction: column;
@@ -1557,7 +1557,7 @@ button {
   align-items: center;
   gap: var(--sp-4);
   width: 100%;
-  padding: var(--sp-2) var(--sp-5);
+  padding: var(--sp-3) var(--sp-5);
   text-align: left;
   color: var(--fg-default);
 }
@@ -1582,7 +1582,7 @@ button {
 }
 
 .palette__item-title {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1633,6 +1633,12 @@ button {
   padding-left: var(--sp-2);
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.subtabs__list {
+  display: flex;
+  align-items: stretch;
+  flex: none;
 }
 
 .subtabs::-webkit-scrollbar {

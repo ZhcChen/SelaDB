@@ -151,10 +151,10 @@ class DataView {
  */
 const TABLE_TABS = [
   { key: "data", label: "数据", icon: "table" },
-  { key: "columns", label: "列", icon: "columns" },
-  { key: "indexes", label: "索引", icon: "index" },
-  { key: "constraints", label: "约束", icon: "check" },
-  { key: "foreignKeys", label: "外键", icon: "keygroup" },
+  { key: "columns", label: "列", icon: "columns", count: (s) => s.columns.length },
+  { key: "indexes", label: "索引", icon: "index", count: (s) => s.indexes.length },
+  { key: "constraints", label: "约束", icon: "check", count: (s) => s.constraints.length },
+  { key: "foreignKeys", label: "外键", icon: "keygroup", count: (s) => s.foreignKeys.length },
   { key: "ddl", label: "DDL", icon: "table" },
 ];
 
@@ -173,17 +173,17 @@ class TableDataView extends DataView {
     // 树右键菜单的「查看结构」落在列分面上
     this.mode = ctx.mode === "structure" ? "columns" : (ctx.mode ?? "data");
 
-    // 过滤条挂到面板头,不给它独占一行
-    this.filterHost = document.createElement("div");
-    this.filterHost.className = "grid__filter-slot";
-
-    this.head = buildPanelHead(ctx, "", [this.filterHost]);
+    this.head = buildPanelHead(ctx, "");
     this.element.appendChild(this.head);
 
-    // 标签栏
+    // 标签栏。过滤条放在这一行的右侧 —— 面板头只留标题,
+    // 表格上方就只占一行 chrome。
     if (this.structure) {
       const tabs = document.createElement("div");
       tabs.className = "subtabs";
+
+      const tabList = document.createElement("div");
+      tabList.className = "subtabs__list";
       for (const tab of TABLE_TABS) {
         const button = document.createElement("button");
         button.type = "button";
@@ -194,11 +194,27 @@ class TableDataView extends DataView {
         label.className = "subtab__label";
         label.textContent = tab.label;
         button.appendChild(label);
+        // 数量角标:合并成一行标签之后,一眼看全结构规模的能力不能丢
+        const count = document.createElement("span");
+        count.className = "subtab__count";
+        count.textContent = String(tab.count?.(this.structure) ?? "");
+        if (count.textContent) button.appendChild(count);
         button.addEventListener("click", () => this.setMode(tab.key));
-        tabs.appendChild(button);
+        tabList.appendChild(button);
       }
+      tabs.appendChild(tabList);
+
+      this.filterHost = document.createElement("div");
+      this.filterHost.className = "grid__filter-slot";
+      tabs.appendChild(this.filterHost);
+
       this.element.appendChild(tabs);
       this.tabs = tabs;
+    } else {
+      // 没有结构视图的表(视图、集合)不需要标签行,过滤条单独放面板头
+      this.filterHost = document.createElement("div");
+      this.filterHost.className = "grid__filter-slot";
+      this.head.appendChild(this.filterHost);
     }
 
     const body = document.createElement("div");
