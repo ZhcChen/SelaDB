@@ -1485,7 +1485,8 @@ button {
 }
 
 .palette {
-  width: min(620px, 92vw);
+  /* 副标题里有「引擎 · 层级路径」,宽度不够就会挤成两行 */
+  width: min(720px, 92vw);
   max-height: 60vh;
   display: flex;
   flex-direction: column;

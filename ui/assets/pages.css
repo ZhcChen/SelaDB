@@ -590,7 +590,7 @@
    数组节点因为要一直显示摘要,子节点会被推到最右边。 */
 .doc-node {
   display: grid;
-  grid-template-columns: 14px 150px minmax(0, 1fr);
+  grid-template-columns: 14px 128px minmax(0, 1fr);
   column-gap: var(--sp-2);
   align-items: baseline;
   padding: 0 var(--sp-4) 0 0;
@@ -691,16 +691,20 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--sp-4);
-  margin-top: var(--sp-6);
+  gap: var(--sp-5);
+  margin-top: var(--sp-7);
   padding-top: var(--sp-5);
   border-top: 1px solid var(--border-subtle);
 }
 
 .entry__engines-label {
-  font-size: var(--fs-xs);
-  color: var(--fg-subtle);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
   letter-spacing: var(--tracking-wide);
+}
+
+.entry__engines .engine-badge {
+  font-size: var(--fs-sm);
 }
 
 /* -----------------------------------------------------------------------------

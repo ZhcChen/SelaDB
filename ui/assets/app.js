@@ -199,6 +199,9 @@ class TableDataView extends DataView {
     for (const item of this.modes?.querySelectorAll(".segmented__item") ?? []) {
       item.classList.toggle("is-active", item.dataset.mode === mode);
     }
+    // 过滤条只对数据网格有意义。结构视图与 DDL 是只读的,挂着个
+    // 「过滤条件,例如 id > 100」纯属语义错乱。
+    this.filterHost.style.display = mode === "data" ? "" : "none";
 
     this.grid?.destroy();
     this.grid = null;
@@ -688,7 +691,7 @@ function buildTopbar() {
   const actions = document.createElement("div");
   actions.className = "topbar__group";
   actions.appendChild(
-    button("", {
+    button("刷新", {
       className: "btn btn--tool",
       icon: "refresh",
       title: "刷新",
@@ -703,6 +706,15 @@ function buildTopbar() {
       onClick: () => openQueryTab(),
     }),
   );
+  bar.appendChild(actions);
+
+  const spacer = document.createElement("div");
+  spacer.className = "topbar__spacer";
+  bar.appendChild(spacer);
+
+  bar.appendChild(buildSeparator());
+
+  // 提交/回滚只对关系型引擎有意义,跟事务模式放一起
   const txButtons = document.createElement("div");
   txButtons.className = "topbar__group";
   txButtons.dataset.role = "tx-actions";
@@ -714,17 +726,12 @@ function buildTopbar() {
   });
   const rollbackBtn = button("回滚", {
     className: "btn btn--tool",
-    icon: "refresh",
+    icon: "undo",
     title: "回滚当前连接的事务",
     onClick: () => console.info("回滚当前连接的事务"),
   });
   txButtons.append(commitBtn, rollbackBtn);
-  actions.appendChild(txButtons);
-  bar.appendChild(actions);
-
-  const spacer = document.createElement("div");
-  spacer.className = "topbar__spacer";
-  bar.appendChild(spacer);
+  bar.appendChild(txButtons);
 
   // 事务模式:做成规范的下拉,原来那个「Auto」按钮既不像下拉也不像开关
   const tx = document.createElement("div");
