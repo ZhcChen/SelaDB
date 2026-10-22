@@ -109,15 +109,22 @@ check(
   tooSmall.map(([k, v]) => `${k} ${v.w}x${v.h}`).join(", "),
 );
 
-// 外壳是上中下三段:顶栏与底栏整条跟侧栏同色,且不画横贯全宽的分割线。
-// 画布那三条边(上 / 下 / 左)由 .workspace 与 .tree 各画一段 —— 线只覆盖画布,
-// 侧栏那根灰柱保持从顶到底连续。
+// 外壳是「左右两大块」:左列是通高的对象树,右列是上下三段
+// (顶栏 / 画布 / 底栏)。顶栏与底栏只覆盖右侧,不横跨侧栏 ——
+// 侧栏要从窗口顶部一直到底,读起来才是一根完整的柱子。
+// 画布那三条边(上 / 下 / 左)由 .workspace 与 .tree 各画一段。
 const shellLines = await page.evaluate(() => {
   const read = (sel, prop) => {
     const el = document.querySelector(sel);
     if (!el) return null;
     const cs = getComputedStyle(el);
     return { border: cs[prop], bg: cs.backgroundColor, img: cs.backgroundImage };
+  };
+  const box = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom), h: Math.round(r.height) };
   };
   return {
     top: read(".topbar", "borderBottomWidth"),
@@ -126,6 +133,12 @@ const shellLines = await page.evaluate(() => {
     workspaceBottom: read(".workspace", "borderBottomWidth"),
     workspaceTopColor: read(".workspace", "borderTopColor"),
     treeRight: read(".tree", "borderRightWidth"),
+    treeBox: box(".tree"),
+    topbarBox: box(".topbar"),
+    statusBox: box(".statusbar"),
+    brand: box(".tree__brand"),
+    topbarBrand: Boolean(document.querySelector(".topbar__brand")),
+    viewH: window.innerHeight,
   };
 });
 check("顶栏与中间区之间没有分割线", shellLines.top?.border === "0px", `border-bottom ${shellLines.top?.border}`);
@@ -154,6 +167,31 @@ check(
   "顶栏与底栏整条跟侧栏同色",
   shellLines.top?.bg === shellLines.bottom?.bg,
   `${shellLines.top?.bg} / ${shellLines.bottom?.bg}`,
+);
+check(
+  "对象树从窗口顶部到底部通高",
+  shellLines.treeBox?.top === 0 && shellLines.treeBox?.bottom === shellLines.viewH,
+  `tree ${shellLines.treeBox?.top}..${shellLines.treeBox?.bottom} / 视口 ${shellLines.viewH}`,
+);
+check(
+  "顶栏只覆盖右侧主内容区(不横跨对象树)",
+  shellLines.topbarBox?.left >= shellLines.treeBox?.right - 1,
+  `topbar left ${shellLines.topbarBox?.left} / tree right ${shellLines.treeBox?.right}`,
+);
+check(
+  "底栏只覆盖右侧主内容区(不横跨对象树)",
+  shellLines.statusBox?.left >= shellLines.treeBox?.right - 1,
+  `statusbar left ${shellLines.statusBox?.left} / tree right ${shellLines.treeBox?.right}`,
+);
+check(
+  "品牌标识在对象树顶部(窗口左上角)",
+  Boolean(shellLines.brand) && shellLines.brand.top === 0 && !shellLines.topbarBrand,
+  `brand top ${shellLines.brand?.top} / 顶栏里还有品牌 ${shellLines.topbarBrand}`,
+);
+check(
+  "侧栏品牌行与顶栏同高(搜索框与画布顶边对齐)",
+  shellLines.brand?.h === 44,
+  `brand height ${shellLines.brand?.h}`,
 );
 
 // 拖动分隔条,侧栏宽度要跟着变

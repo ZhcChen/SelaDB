@@ -689,15 +689,8 @@ function buildTopbar() {
   const bar = document.createElement("header");
   bar.className = "topbar";
 
-  const brand = document.createElement("div");
-  brand.className = "topbar__brand";
-  const logo = document.createElement("span");
-  logo.className = "topbar__logo";
-  brand.appendChild(logo);
-  brand.appendChild(document.createTextNode("SelaDB"));
-  bar.appendChild(brand);
-
-  bar.appendChild(buildSeparator());
+  // 品牌标识搬到了左侧通高的对象树顶部(桌面应用的品牌在窗口左上角),
+  // 这里只留动作:左边是数据级操作,右边是事务 / 连接 / 搜索 / 设置。
 
   // 数据级操作
   const actions = document.createElement("div");
@@ -988,6 +981,16 @@ async function confirmDeleteNode(node) {
 function buildTreePanel() {
   const panel = document.createElement("aside");
   panel.className = "tree";
+
+  // 品牌标识:窗口左上角。侧栏通高之后,这里是整个窗口的左上角 ——
+  // 桌面应用的品牌就该在这儿,顶栏只留动作。
+  const brand = document.createElement("div");
+  brand.className = "tree__brand";
+  const logo = document.createElement("span");
+  logo.className = "tree__brand-logo";
+  brand.appendChild(logo);
+  brand.appendChild(document.createTextNode("SelaDB"));
+  panel.appendChild(brand);
 
   const searchWrap = document.createElement("div");
   searchWrap.className = "tree__search";
@@ -1496,17 +1499,38 @@ function statusItem(text) {
 /* -----------------------------------------------------------------------------
  * 10. 工作台外壳
  * -------------------------------------------------------------------------- */
+/**
+ * 主工作台的外壳。
+ *
+ * 布局是「左右两大块」:左边是通高的对象树,右边是上下三段。
+ *
+ *   ┌────────┬─────────────────────────┐
+ *   │ 品牌   │ 顶栏                      │  ← 右列:上下
+ *   │ 搜索   ├─────────────────────────┤
+ *   │ 对象树 │ 主内容(画布)              │  ← 右列:上下
+ *   │        ├─────────────────────────┤
+ *   │        │ 底栏                      │
+ *   └────────┴─────────────────────────┘
+ *
+ * 之前是「上下三段 + 主区左右」,顶栏与底栏横跨全宽,把左侧对象树压在
+ * 下面 —— 侧栏读起来像被顶栏切了一截,不是一根通高的柱子。改成侧栏通高
+ * 之后,左边是完整的一列,右边自己再分上下,跟 DataGrip / DBeaver /
+ * Beekeeper / TablePlus 的结构一致。
+ */
 function renderWorkbench(root) {
   root.replaceChildren();
   const app = document.createElement("div");
   app.className = "app";
 
-  app.appendChild(buildTopbar());
+  // 左列:对象树,从窗口顶部一直到底
+  app.appendChild(buildTreePanel());
+  app.appendChild(buildSplitter());
 
-  const body = document.createElement("div");
-  body.className = "app__body";
-  body.appendChild(buildTreePanel());
-  body.appendChild(buildSplitter());
+  // 右列:上下三段
+  const column = document.createElement("div");
+  column.className = "app__column";
+
+  column.appendChild(buildTopbar());
 
   const workspace = document.createElement("main");
   workspace.className = "workspace";
@@ -1515,14 +1539,14 @@ function renderWorkbench(root) {
   workspaceBody.className = "panel__body";
   workspaceBody.dataset.role = "workspace-body";
   workspace.appendChild(workspaceBody);
-  body.appendChild(workspace);
-
-  app.appendChild(body);
+  column.appendChild(workspace);
 
   const statusbar = document.createElement("footer");
   statusbar.className = "statusbar";
   statusbar.dataset.role = "statusbar";
-  app.appendChild(statusbar);
+  column.appendChild(statusbar);
+
+  app.appendChild(column);
 
   root.appendChild(app);
   state.shell = app;

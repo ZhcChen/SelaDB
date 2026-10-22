@@ -103,17 +103,20 @@ button {
 /* -----------------------------------------------------------------------------
  * 1. 应用外壳
  *
- * 标题栏 / 工具栏 / (对象树 | 工作区) / 状态栏
+ * 左右两大块:左边是通高的对象树,右边是上下三段(顶栏 / 工作区 / 底栏)。
  * -------------------------------------------------------------------------- */
 .app {
-  display: grid;
-  grid-template-rows: var(--h-topbar) 1fr var(--h-statusbar);
+  display: flex;
   height: 100vh;
   overflow: hidden;
 }
 
-.app__body {
+/* 右列:上下三段 */
+.app__column {
+  flex: 1;
+  min-width: 0;
   display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
@@ -125,15 +128,11 @@ button {
  * 占了 40px 纵向空间。合并成一行后,把纵向空间还给数据网格。
  * -------------------------------------------------------------------------- */
 /*
- * 外壳是上中下三段:顶栏 / 工作区(侧栏 + 主内容) / 底栏。
+ * 顶栏只覆盖右侧主内容区,不再横跨对象树 —— 侧栏改成通高的一列之后,
+ * 顶栏就成了右边那一列的工具条,品牌标识搬到侧栏顶部(窗口左上角)。
  *
- * 顶栏与底栏整条用侧栏的底色,与中间区之间**不画分割线** —— 三段的边界
- * 全靠底色分:顶栏、侧栏、底栏连成一条浅灰的带,主内容区是留白的画布嵌在
- * 右侧。这是桌面工具的惯例(VS Code 浅色主题:标题栏/侧边栏/状态栏同色,
- * 编辑区留白,彼此无线),比「顶栏底栏各压一条横贯的线」干净:
- * 那条线会把侧栏从中间切断,侧栏就不再是一条贯通的列。
- *
- * 侧栏是浅灰、主内容是白,两者的边界同样靠底色差,不需要竖线。
+ * 顶栏与底栏跟侧栏同色(--bg-panel),彼此之间不画分割线;画布那三条边
+ * (上、下、左)各有 1px 结构线,画布于是成了一张嵌在灰框里的纸。
  */
 .topbar {
   display: flex;
@@ -142,25 +141,6 @@ button {
   height: var(--h-topbar);
   padding: 0 var(--sp-4);
   background: var(--bg-panel);
-}
-
-.topbar__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding-right: var(--sp-2);
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-base);
-  letter-spacing: var(--tracking-wide);
-  color: var(--fg-default);
-  flex: none;
-}
-
-.topbar__logo {
-  width: 16px;
-  height: 16px;
-  border-radius: var(--r-sm);
-  background: linear-gradient(135deg, var(--accent), var(--engine-mongodb));
   flex: none;
 }
 
@@ -351,6 +331,8 @@ button {
 
 /* -----------------------------------------------------------------------------
  * 5. 对象树
+ *
+ * 通高的一列,从窗口顶部一直到底 —— 顶栏与底栏只覆盖右侧主内容区。
  * -------------------------------------------------------------------------- */
 .tree {
   display: flex;
@@ -364,6 +346,29 @@ button {
   background: var(--bg-panel);
   border-right: 1px solid var(--border-subtle);
   overflow: hidden;
+}
+
+/* 品牌标识:窗口左上角。高度跟顶栏一致,于是侧栏的搜索框那一行
+   与右侧画布的顶边正好对齐。 */
+.tree__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: var(--h-topbar);
+  padding: 0 var(--sp-4);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-base);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-default);
+  flex: none;
+}
+
+.tree__brand-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(135deg, var(--accent), var(--engine-mongodb));
+  flex: none;
 }
 
 .tree__search {
@@ -668,6 +673,10 @@ button {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  /* 列方向 flex 里的 min-height 默认是 auto,内容多高就撑多高,
+     底栏会被挤出视口 —— 必须显式归零。 */
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-canvas);
   /* 画布是嵌在灰框里的一张纸,上、下、左三边各一条 1px 结构线。
      左边那条在 .tree 的 border-right 上 —— 画到 .workspace 上会横贯侧栏,
@@ -1220,10 +1229,12 @@ button {
   display: flex;
   align-items: center;
   gap: var(--sp-5);
+  height: var(--h-statusbar);
   padding: 0 var(--sp-4);
   background: var(--bg-panel);
   font-size: var(--fs-xs);
   color: var(--fg-muted);
+  flex: none;
 }
 
 .statusbar__spacer {
