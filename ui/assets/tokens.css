@@ -49,8 +49,10 @@
   --bg-overlay: rgba(0, 0, 0, 0.32);
 
   /* 分割线要淡到「几乎看不见但确实在」。
-     结构线比「几乎看不见」还要往上抬一档 —— 外壳与工作区的分界
-     全靠它,差 5 级等于没有。 */
+     结构线比「几乎看不见」还要往上抬一档 —— 画布三边的分界全靠它,
+     差 5 级等于没有。
+     这一档对应 VS Code 2026 的 surface.border(#E4E5E6)与
+     Light Modern 的 titleBar/statusBar.border(#E5E5E5)。 */
   --border-subtle: #e4e8ec;
   --border-default: #d9d9dd;
   --border-strong: #c2c2c7;

@@ -134,6 +134,11 @@ async function review(filePath, context) {
  * 只看得到「灰色块变少了」,于是把「底色差改成 1px 线」误判成
  * 「容器感变弱、界面单薄」。上半给全景比布局,下半给 2 倍放大的角落
  * 比细节(侧栏分界线、输入框边框)。
+ *
+ * **必须带差异掩码。** 光靠两张图,模型经常连「哪里变了」都读不出来:
+ * 加了一条 1px 线,它会判成「改动后移除了分隔线」,方向完全反了。
+ * 掩码是逐像素算出来的客观事实 —— 品红 = 有差异,灰 = 没变,
+ * 拿它当锚点,判断才落得到具体位置上。
  */
 async function makeComposite(beforePath, afterPath, outPath) {
   const before = (await readFile(beforePath)).toString("base64");
@@ -141,6 +146,62 @@ async function makeComposite(beforePath, afterPath, outPath) {
 
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1460, height: 1400 } });
+
+  // 逐像素差异掩码:有差异处填品红,无差异处压成灰度
+  const mask = await page.evaluate(
+    async ([a, b]) => {
+      const load = (src) =>
+        new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = () => rej(new Error("差异掩码:底图加载失败"));
+          // 传进来的是裸 base64,必须补上 data URL 前缀才能加载
+          img.src = `data:image/png;base64,${src}`;
+        });
+      const [ia, ib] = await Promise.all([load(a), load(b)]);
+      const W = Math.min(ia.width, ib.width);
+      const H = Math.min(ia.height, ib.height);
+      const draw = (img) => {
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0);
+        return g.getImageData(0, 0, W, H).data;
+      };
+      const da = draw(ia);
+      const db = draw(ib);
+      const out = document.createElement("canvas");
+      out.width = W;
+      out.height = H;
+      const ctx = out.getContext("2d");
+      const img = ctx.createImageData(W, H);
+      let changed = 0;
+      for (let i = 0; i < da.length; i += 4) {
+        const d =
+          Math.abs(da[i] - db[i]) +
+          Math.abs(da[i + 1] - db[i + 1]) +
+          Math.abs(da[i + 2] - db[i + 2]);
+        if (d > 12) {
+          changed++;
+          img.data[i] = 255;
+          img.data[i + 1] = 0;
+          img.data[i + 2] = 190;
+        } else {
+          const g = (da[i] * 0.3 + da[i + 1] * 0.5 + da[i + 2] * 0.2) * 0.45 + 190;
+          img.data[i] = g;
+          img.data[i + 1] = g;
+          img.data[i + 2] = g;
+        }
+        img.data[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      const pct = ((changed / (W * H)) * 100).toFixed(2);
+      return { url: out.toDataURL("image/png"), pct, changed, W, H };
+    },
+    [before, after],
+  );
+
   await page.setContent(`<!DOCTYPE html>
 <html><body style="margin:0;background:#dfe3e9;font:600 13px/1.6 -apple-system,'PingFang SC',sans-serif;color:#1c2230">
   <div style="display:flex;gap:10px;padding:10px">
@@ -167,7 +228,7 @@ async function makeComposite(beforePath, afterPath, outPath) {
       </div>
     </figure>
   </div>
-  <div style="display:flex;gap:10px;padding:0 10px 10px">
+  <div style="display:flex;gap:10px;padding:0 10px 8px">
     <figure style="margin:0;flex:1">
       <figcaption style="padding:4px 2px">改动前 · 右上 2×(顶栏搜索框)</figcaption>
       <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
@@ -179,6 +240,12 @@ async function makeComposite(beforePath, afterPath, outPath) {
       <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
         <img src="data:image/png;base64,${after}" style="position:absolute;top:0;right:0;width:1440px;height:900px;transform-origin:100% 0;transform:scale(2)">
       </div>
+    </figure>
+  </div>
+  <div style="padding:0 10px 10px">
+    <figure style="margin:0">
+      <figcaption style="padding:4px 2px">逐像素差异掩码 —— 品红 = 改动过的像素,灰 = 没变(共 ${mask.pct}%)</figcaption>
+      <img src="${mask.url}" style="width:100%;display:block;border:1px solid #b8c0cd">
     </figure>
   </div>
 </body></html>`);
@@ -202,18 +269,26 @@ async function compare(beforePath, afterPath, context) {
   await makeComposite(beforePath, afterPath, compositePath);
 
   const url = await upload(compositePath);
-  const prompt = `这是一张对照图:左边是改动前,右边是改动后。界面是:
+  const prompt = `这是一张对照图,界面是:
 ${context}
 
-对照图分两层:
-- 上半:两张全窗口缩略图,用来比整体分块与信息层级
-- 下半:左右上角与右上角的 2 倍放大图,用来比细节(分隔线、输入框边框、底色差)
+对照图分四层:
+- 第一行:两张全窗口缩略图,左边改动前、右边改动后,比整体分块与信息层级
+- 第二、三行:左上角与右上角的 2 倍放大图,比细节(分隔线、输入框边框、底色差)
+- 最下面一行:**逐像素差异掩码**。品红 = 这一处像素跟改动前不一样,灰 = 没变。
+  这行是客观事实,先看它 —— 它直接告诉你改动到底落在哪些位置上。
 
-**1px 的结构分隔线在缩略图上几乎看不见,判断这类改动必须以下半的放大图为准。**
+**判断顺序:先看差异掩码确定改动落在哪,再去放大图上看那个位置长什么样。**
+不要凭印象说「哪里变了」,也不要猜反了方向(改动前有、改动后没,
+或者反过来,掩码上一目了然)。
+
+**理由必须与掩码一致。** 掩码上没变化的地方(灰色)不要写成有变化 ——
+添加一个原本不存在的控件、调整某处的内边距、调整个模块的居中,
+如果掩码上没有对应的品红区域,那就是你编的,不要写。
 
 请只比较视觉与信息表达,不看功能是否实现。回答:
 1. 哪一边更好?给出 "before" 或 "after"
-2. 好在哪,差在哪(各 1–2 句)
+2. 好在哪,差在哪(各 1–2 句)。**必须点名掩码上具体变了哪几处**
 3. 改动后有没有引入新的问题
 
 硬规矩:**只报告你能在图上明确指认的差异**。1px 级别的结构线请以放大行为依据;

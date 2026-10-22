@@ -669,6 +669,14 @@ button {
   flex: 1;
   min-width: 0;
   background: var(--bg-canvas);
+  /* 画布是嵌在灰框里的一张纸,上、下、左三边各一条 1px 结构线。
+     左边那条在 .tree 的 border-right 上 —— 画到 .workspace 上会横贯侧栏,
+     把「一整条连续的灰柱」切断(上一轮去掉全宽横线就是为了这个)。
+     顶栏与底栏不给线,它们跟侧栏同色,本来就是连成一条灰带;
+     参照实现也是同一套:VS Code 2026 的 titleBar.border / statusBar.border
+     都是 #F0F1F2 这一档的细边,而不是另起一个更重的底色。 */
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tabbar {

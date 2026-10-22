@@ -109,7 +109,9 @@ check(
   tooSmall.map(([k, v]) => `${k} ${v.w}x${v.h}`).join(", "),
 );
 
-// 外壳是上中下三段:顶栏与底栏整条跟侧栏同色,与中间区之间没有分割线
+// 外壳是上中下三段:顶栏与底栏整条跟侧栏同色,且不画横贯全宽的分割线。
+// 画布那三条边(上 / 下 / 左)由 .workspace 与 .tree 各画一段 —— 线只覆盖画布,
+// 侧栏那根灰柱保持从顶到底连续。
 const shellLines = await page.evaluate(() => {
   const read = (sel, prop) => {
     const el = document.querySelector(sel);
@@ -117,10 +119,37 @@ const shellLines = await page.evaluate(() => {
     const cs = getComputedStyle(el);
     return { border: cs[prop], bg: cs.backgroundColor, img: cs.backgroundImage };
   };
-  return { top: read(".topbar", "borderBottomWidth"), bottom: read(".statusbar", "borderTopWidth") };
+  return {
+    top: read(".topbar", "borderBottomWidth"),
+    bottom: read(".statusbar", "borderTopWidth"),
+    workspaceTop: read(".workspace", "borderTopWidth"),
+    workspaceBottom: read(".workspace", "borderBottomWidth"),
+    workspaceTopColor: read(".workspace", "borderTopColor"),
+    treeRight: read(".tree", "borderRightWidth"),
+  };
 });
 check("顶栏与中间区之间没有分割线", shellLines.top?.border === "0px", `border-bottom ${shellLines.top?.border}`);
 check("底栏与中间区之间没有分割线", shellLines.bottom?.border === "0px", `border-top ${shellLines.bottom?.border}`);
+check(
+  "画布上边有 1px 结构线",
+  shellLines.workspaceTop?.border === "1px",
+  `border-top ${shellLines.workspaceTop?.border}`,
+);
+check(
+  "画布下边有 1px 结构线",
+  shellLines.workspaceBottom?.border === "1px",
+  `border-bottom ${shellLines.workspaceBottom?.border}`,
+);
+check(
+  "侧栏右边有 1px 结构线",
+  shellLines.treeRight?.border === "1px",
+  `border-right ${shellLines.treeRight?.border}`,
+);
+check(
+  "画布三边用同一个 token(--border-subtle)",
+  shellLines.workspaceTopColor?.border === "rgb(228, 232, 236)",
+  `border-top-color ${shellLines.workspaceTopColor?.border}`,
+);
 check(
   "顶栏与底栏整条跟侧栏同色",
   shellLines.top?.bg === shellLines.bottom?.bg,
