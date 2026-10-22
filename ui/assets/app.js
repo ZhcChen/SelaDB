@@ -1971,10 +1971,11 @@ function renderConnect(root) {
 
     const fields = connectionFields(engine);
     const controls = fields.map((field) => createField(field));
-    for (const control of controls) {
-      control.element.classList.add("field--full");
+    controls.forEach((control, index) => {
+      // 只有连接名独占一行,其余参数两列排 —— 竖屏那么宽,一行一个太浪费
+      if (index === 0) control.element.classList.add("field--full");
       form.appendChild(control.element);
-    }
+    });
     stepBody.appendChild(form);
   }
 

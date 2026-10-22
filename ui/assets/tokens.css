@@ -242,12 +242,12 @@ body[data-theme="dark"] {
   --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas,
     "Liberation Mono", "Noto Sans Mono CJK SC", monospace;
 
-  --fs-xs: 11px;
-  --fs-sm: 12px;
-  --fs-base: 13px;
-  --fs-md: 14px;
-  --fs-lg: 16px;
-  --fs-xl: 20px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 21px;
 
   --lh-tight: 1.25;
   --lh-base: 1.5;
@@ -261,8 +261,8 @@ body[data-theme="dark"] {
 
   /* 代码编辑器:等宽字体,行高固定,高亮层与输入层必须完全一致才能对齐 */
   --font-code: var(--font-mono);
-  --fs-code: 12.5px;
-  --lh-code: 20px;
+  --fs-code: 13px;
+  --lh-code: 22px;
   --code-pad-y: 10px;
   --code-pad-x: 14px;
   --code-gutter-w: 44px;
@@ -310,29 +310,29 @@ body[data-theme="dark"] {
  * -------------------------------------------------------------------------- */
 :root,
 body[data-density="comfortable"] {
-  --row-h: 30px;
-  --row-h-sm: 24px;
-  /* 对象树比表格更密:树的行是导航不是数据,一行省 2px 一屏多看几行 */
-  --row-h-tree: 23px;
+  --row-h: 32px;
+  --row-h-sm: 26px;
+  /* 树的一级缩进步长。层级要看得出来,靠的不只是缩进,还有导轨线。 */
+  --row-h-tree: 27px;
   --cell-x: 10px;
+  --indent: 16px;
+  --tree-indent: 16px;
+  --fs-base: 14px;
+  --fs-sm: 13px;
+  /* 表头分两行:列名一行、类型一行 */
+  --header-h: 42px;
+}
+
+body[data-density="compact"] {
+  --row-h: 26px;
+  --row-h-sm: 22px;
+  --row-h-tree: 24px;
+  --cell-x: 8px;
   --indent: 14px;
   --tree-indent: 14px;
   --fs-base: 13px;
   --fs-sm: 12px;
-  /* 表头分两行:列名一行、类型一行 */
   --header-h: 38px;
-}
-
-body[data-density="compact"] {
-  --row-h: 24px;
-  --row-h-sm: 20px;
-  --row-h-tree: 20px;
-  --cell-x: 8px;
-  --indent: 12px;
-  --tree-indent: 12px;
-  --fs-base: 12px;
-  --fs-sm: 11px;
-  --header-h: 34px;
 }
 
 /* -----------------------------------------------------------------------------
@@ -342,9 +342,9 @@ body[data-density="compact"] {
  * -------------------------------------------------------------------------- */
 :root {
   /* 标题栏与工具栏合并成一行 —— 之前分成两行,第二行横向空旷却占 40px */
-  --h-topbar: 40px;
-  --h-statusbar: 26px;
-  --h-tabbar: 32px;
+  --h-topbar: 44px;
+  --h-statusbar: 28px;
+  --h-tabbar: 36px;
 
   --w-tree: 268px;
   --w-tree-min: 180px;

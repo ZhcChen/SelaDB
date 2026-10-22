@@ -43,7 +43,7 @@ class TreeView {
     this.container.replaceChildren();
     const fragment = document.createDocumentFragment();
     for (const root of this.roots) {
-      fragment.appendChild(this.#renderNode(root));
+      fragment.appendChild(this.#renderNode(root, 0));
     }
     this.container.appendChild(fragment);
     this.#applyFilter(this.filterText);
@@ -88,7 +88,7 @@ class TreeView {
 
   // ---- 内部实现 ----
 
-  #renderNode(data) {
+  #renderNode(data, depth = 0) {
     const branch = document.createElement("div");
     branch.className = "tree__branch";
 
@@ -96,6 +96,8 @@ class TreeView {
     node.className = "tree__node";
     node.dataset.id = data.id;
     node.dataset.kind = data.kind ?? "";
+    // 层级深度:用来区分「目录」和「叶子」的视觉权重
+    node.dataset.depth = String(depth);
     node.title = data.label;
 
     const hasChildren = Array.isArray(data.children) && data.children.length > 0;
@@ -147,7 +149,7 @@ class TreeView {
     children.className = "tree__children";
     if (hasChildren) {
       for (const child of data.children) {
-        children.appendChild(this.#renderNode(child));
+        children.appendChild(this.#renderNode(child, depth + 1));
       }
     }
     branch.appendChild(children);

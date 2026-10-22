@@ -8,6 +8,13 @@
  *   P2  文档树 / 键值列表(为 V0.5 预留,先不实现)
  * ========================================================================== */
 
+/* 挂载点撑满视口,页面级的 flex:1 才有意义(入口页要垂直居中) */
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
 /* -----------------------------------------------------------------------------
  * 0. 基础
  * -------------------------------------------------------------------------- */
@@ -345,7 +352,7 @@ button {
 
 .tree__search input {
   width: 100%;
-  height: 24px;
+  height: 28px;
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
   background: var(--bg-inset);
@@ -436,6 +443,21 @@ button {
   white-space: nowrap;
 }
 
+/* 层级权重:连接与数据库是「目录」,该比表、字段重 */
+.tree__node[data-depth="0"] .tree__label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+
+.tree__node[data-depth="1"] .tree__label {
+  font-weight: var(--fw-medium);
+}
+
+.tree__node[data-depth="0"] .tree__icon,
+.tree__node[data-depth="1"] .tree__icon {
+  color: var(--fg-default);
+}
+
 /* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到 */
 .tree__count {
   flex: none;
@@ -451,8 +473,20 @@ button {
   border-radius: var(--r-xs);
 }
 
+/*
+ * 树的层级靠两样东西撑起来:真缩进 + 导轨线。
+ *
+ * 之前 --tree-indent 这个 token 定义了却从没被接上,所有层级的文字都从
+ * 同一个 x 开始 —— 展开之后看上去全是同级的。
+ *
+ * 导轨线画在子层容器的左边框上,正好落在父层展开箭头的下方,
+ * 一眼就能看出「这一串是它的子级」。
+ */
 .tree__children {
   display: none;
+  margin-left: 6px;
+  padding-left: 9px;
+  border-left: 1px solid var(--border-default);
 }
 
 .tree__children.is-open {
