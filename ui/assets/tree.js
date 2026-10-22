@@ -109,14 +109,9 @@ class TreeView {
     twisty.appendChild(createIcon("chevron", 12));
     node.appendChild(twisty);
 
-    // 连接节点左侧的引擎色条,让多连接时一眼分辨。
-    // 连接节点的 icon 就是引擎 id,所以 icon 缺失时退回 kind。
+    // 连接节点用引擎专属图标,一眼分清是哪种数据库。
+    // 连接节点的 icon 字段就是引擎 id,不是图标名。
     const engineId = data.kind === "connection" ? data.engine ?? data.icon : null;
-    if (engineId) {
-      const dot = document.createElement("span");
-      dot.className = `tree__engine-dot engine-${engineId}`;
-      node.appendChild(dot);
-    }
 
     const iconWrap = document.createElement("span");
     iconWrap.className = "tree__icon";
@@ -125,10 +120,13 @@ class TreeView {
       // 引擎品牌色从节点上取,树里混着多个引擎时靠颜色就能分辨
       if (engineId) iconWrap.style.setProperty("--engine-color", `var(--engine-${engineId})`);
     }
-    // 连接节点用统一的插头图标,引擎靠左侧色条区分;
-    // mock 数据里的 icon 字段是引擎 id,不是图标名。
-    const iconName = data.kind === "connection" ? "connection" : data.icon ?? iconForKind(data.kind);
-    iconWrap.appendChild(createIcon(iconName, 15));
+    const engineIcon = engineId ? createEngineIcon(engineId, 16) : null;
+    if (engineIcon) {
+      iconWrap.appendChild(engineIcon);
+    } else {
+      const iconName = data.icon ?? iconForKind(data.kind);
+      iconWrap.appendChild(createIcon(iconName, 15));
+    }
     node.appendChild(iconWrap);
 
     const label = document.createElement("span");

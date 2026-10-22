@@ -71,8 +71,21 @@ await page.waitForSelector(".tree__node", { timeout: 10000 });
 const connectionNodes = await page.locator(".tree__node[data-kind='connection']").count();
 check("对象树渲染出 4 个连接", connectionNodes === 4, `实际 ${connectionNodes}`);
 
-const engineDots = await page.locator(".tree__engine-dot").count();
-check("连接节点带引擎色条", engineDots === 4, `实际 ${engineDots}`);
+const engineIcons = await page.locator(".tree__node[data-kind='connection'] .icon--engine").count();
+check("连接节点带引擎专属图标", engineIcons === 4, `实际 ${engineIcons}`);
+
+const iconShapes = await page.evaluate(() => {
+  const nodes = [...document.querySelectorAll(".tree__node[data-kind='connection'] .icon--engine")];
+  return nodes.map((n) => n.querySelector("path")?.getAttribute("d")?.slice(0, 40) ?? "");
+});
+const distinctShapes = new Set(iconShapes).size;
+check("不同引擎的图标形状互不相同", distinctShapes === iconShapes.length, `实际 ${distinctShapes} 种`);
+
+const iconColors = await page.evaluate(() => {
+  const nodes = [...document.querySelectorAll(".tree__node[data-kind='connection'] .tree__icon")];
+  return nodes.map((n) => getComputedStyle(n).color);
+});
+check("引擎图标各自带品牌色", new Set(iconColors).size > 1, `实际 ${new Set(iconColors).size} 种颜色`);
 
 await shot(page, "01-workbench-light");
 
@@ -86,8 +99,12 @@ await page.locator(".tree__node[data-id='pg-local/postgres/public/users']").clic
 const tabs = await page.locator(".tab").count();
 check("点击表后打开一个 Tab", tabs === 1, `实际 ${tabs}`);
 
-const tabEngine = await page.locator(".tab__engine").first().textContent();
-check("Tab 带引擎标识", (tabEngine ?? "").trim().length > 0, `标识 "${tabEngine?.trim()}"`);
+const tabEngine = await page.locator(".tab__engine").first();
+check(
+  "Tab 带引擎标识",
+  (await tabEngine.count()) > 0 && (await tabEngine.getAttribute("aria-label"))?.length > 0,
+  `标识 "${await tabEngine.getAttribute("aria-label")}"`,
+);
 
 // ---- 网格 ----
 console.log("\n[3] 数据网格");
@@ -192,7 +209,9 @@ await page.waitForTimeout(200);
 const multiTabs = await page.locator(".tab").count();
 check("可以同时打开多个连接的 Tab", multiTabs === 2, `实际 ${multiTabs}`);
 
-const engines = await page.locator(".tab__engine").allTextContents();
+const engines = await page.locator(".tab__engine").evaluateAll((nodes) =>
+  nodes.map((n) => n.getAttribute("aria-label") ?? ""),
+);
 check("各 Tab 带各自引擎标识", new Set(engines.map((t) => t.trim())).size === 2, engines.join(" / "));
 
 // ---- NoSQL 视图 ----
@@ -399,6 +418,16 @@ console.log("\n[12] 连接向导");
 await page.goto(`${BASE}#/connect`, { waitUntil: "networkidle" });
 await page.waitForSelector(".engine-card", { timeout: 5000 });
 check("向导第一步列出六种引擎", (await page.locator(".engine-card").count()) === 6);
+
+const cardIcons = await page.locator(".engine-card .icon--engine").count();
+check("六个引擎卡片各带专属图标", cardIcons === 6, `实际 ${cardIcons}`);
+
+const allHaveIcon = await page.evaluate(() =>
+  ["postgresql", "mysql", "sqlite", "mongodb", "redis", "sqlserver"].every((id) =>
+    hasEngineIcon(id),
+  ),
+);
+check("六种引擎都定义了专属图标", allHaveIcon);
 
 await page.locator(".engine-card").first().click();
 await page.locator(".btn--primary", { hasText: "下一步" }).click();

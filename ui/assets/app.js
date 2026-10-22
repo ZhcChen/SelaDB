@@ -16,15 +16,19 @@
 const THEME_KEY = "seladb.ui.theme";
 const DENSITY_KEY = "seladb.ui.density";
 
-/** Tab 上的引擎短标识 —— 空间有限,不能用完整名称。 */
-const ENGINE_SHORT = {
-  postgresql: "PG",
-  mysql: "MYSQL",
-  sqlite: "SQLITE",
-  sqlserver: "MSSQL",
-  mongodb: "MONGO",
-  redis: "REDIS",
-};
+/**
+ * 引擎徽标:专属图标 + 引擎名。
+ *
+ * 图标已经带引擎品牌色,不再另配圆点 —— 同一信息不重复编码。
+ */
+function buildEngineBadge(engineId, size = 13, label = null) {
+  const badge = document.createElement("span");
+  badge.className = `engine-badge engine-${engineId}`;
+  const icon = createEngineIcon(engineId, size);
+  if (icon) badge.appendChild(icon);
+  badge.appendChild(document.createTextNode(label ?? ENGINES[engineId]?.label ?? engineId));
+  return badge;
+}
 
 const state = {
   /** 已打开的 Tab。Tab 不绑定连接,自身携带 connectionId。 */
@@ -488,12 +492,7 @@ function buildPanelHead(ctx, meta, controls = []) {
 
   const title = document.createElement("div");
   title.className = "panel__title";
-  const badge = document.createElement("span");
-  badge.className = `engine-badge engine-${ctx.connection.engine}`;
-  const dot = document.createElement("span");
-  dot.className = "engine-badge__dot";
-  badge.appendChild(dot);
-  badge.appendChild(document.createTextNode(ENGINES[ctx.connection.engine].label));
+  const badge = buildEngineBadge(ctx.connection.engine);
   title.appendChild(badge);
   title.appendChild(document.createTextNode(ctx.node.label));
   head.appendChild(title);
@@ -624,12 +623,7 @@ function buildStartPanel() {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "start__recent-item";
-    const badge = document.createElement("span");
-    badge.className = `engine-badge engine-${entry.connection.engine}`;
-    const dot = document.createElement("span");
-    dot.className = "engine-badge__dot";
-    badge.appendChild(dot);
-    badge.appendChild(document.createTextNode(ENGINES[entry.connection.engine].label));
+    const badge = buildEngineBadge(entry.connection.engine);
     item.appendChild(badge);
     const name = document.createElement("span");
     name.className = "start__recent-name";
@@ -1142,10 +1136,13 @@ function renderTabs() {
     if (tab.id === state.activeTabId) el.classList.add("is-active");
     el.dataset.tabId = tab.id;
 
-    const engine = document.createElement("span");
-    engine.className = `tab__engine engine-${tab.connection.engine}`;
-    engine.textContent = ENGINE_SHORT[tab.connection.engine] ?? "SQL";
-    el.appendChild(engine);
+    // Tab 上用引擎专属图标,不写短名 —— 图标比缩写更快认出来,也省横向空间
+    const engine = createEngineIcon(tab.connection.engine, 14);
+    if (engine) {
+      engine.classList.add("tab__engine", `engine-${tab.connection.engine}`);
+      engine.setAttribute("aria-label", ENGINES[tab.connection.engine]?.label ?? "");
+      el.appendChild(engine);
+    }
 
     const name = document.createElement("span");
     name.className = "tab__name";
@@ -1649,13 +1646,7 @@ function renderEntry(root) {
   enginesLabel.textContent = "第一版支持";
   engines.appendChild(enginesLabel);
   for (const engine of Object.values(ENGINES)) {
-    const badge = document.createElement("span");
-    badge.className = `engine-badge engine-${engine.id}`;
-    const dot = document.createElement("span");
-    dot.className = "engine-badge__dot";
-    badge.appendChild(dot);
-    badge.appendChild(document.createTextNode(engine.label));
-    engines.appendChild(badge);
+    engines.appendChild(buildEngineBadge(engine.id, 14));
   }
   inner.appendChild(engines);
 
@@ -1699,6 +1690,9 @@ function renderSpec(root) {
     ["--engine-sqlite", "SQLite"], ["--engine-sqlserver", "SQL Server"],
     ["--engine-mongodb", "MongoDB"], ["--engine-redis", "Redis"],
   ]));
+
+  // 引擎图标
+  inner.appendChild(buildEngineIconSection());
 
   // 组件清单
   const componentSection = document.createElement("section");
@@ -1764,12 +1758,9 @@ function renderSpec(root) {
         ["Redis", "连接 → db0 → 类型分组 → 键", "键列表", "已设计"],
       ],
       (row) => {
-        const badge = document.createElement("span");
-        badge.className = `engine-badge engine-${row[0] === "MySQL / MariaDB" ? "mysql" : row[0].toLowerCase().replace(/\s+/g, "")}`;
-        const dot = document.createElement("span");
-        dot.className = "engine-badge__dot";
-        badge.appendChild(dot);
-        badge.appendChild(document.createTextNode(row[0]));
+        const engineId =
+          row[0] === "MySQL / MariaDB" ? "mysql" : row[0].toLowerCase().replace(/\s+/g, "");
+        const badge = buildEngineBadge(engineId, 13, row[0]);
         const pill = document.createElement("span");
         pill.className = "pill pill--ok";
         pill.textContent = row[3];
@@ -1799,6 +1790,65 @@ function buildPageHead(eyebrow, title, lead) {
   l.textContent = lead;
   head.appendChild(l);
   return head;
+}
+
+/**
+ * 引擎图标区:规范页用,列出六枚引擎专属图标。
+ *
+ * 左边是实际使用尺寸 16px(对象树、Tab、徽标),右边 32px 便于核对形状。
+ */
+function buildEngineIconSection() {
+  const section = document.createElement("section");
+  section.className = "section";
+
+  const title = document.createElement("h2");
+  title.className = "section__title";
+  title.textContent = "引擎图标";
+  section.appendChild(title);
+
+  const desc = document.createElement("p");
+  desc.className = "section__desc";
+  desc.textContent =
+    "六种引擎各一枚实心剪影,统一 24×24 视窗、20×20 光学尺寸,单色 currentColor 跟随 --engine-*。" +
+    "用实心不用线稿:15px 下线稿会糊成一团。左边 16px 是实际使用尺寸,右边 32px 便于核对形状。";
+  section.appendChild(desc);
+
+  const grid = document.createElement("div");
+  grid.className = "engine-icon-grid";
+  for (const [id, label, shape] of [
+    ["postgresql", "PostgreSQL", "象头"],
+    ["mysql", "MySQL", "海豚"],
+    ["sqlite", "SQLite", "羽毛"],
+    ["mongodb", "MongoDB", "叶"],
+    ["redis", "Redis", "层叠块"],
+    ["sqlserver", "SQL Server", "S"],
+  ]) {
+    const cell = document.createElement("div");
+    cell.className = `engine-icon-cell engine-${id}`;
+
+    const sizes = document.createElement("div");
+    sizes.className = "engine-icon-cell__sizes";
+    for (const size of [16, 32]) {
+      const icon = createEngineIcon(id, size);
+      if (icon) sizes.appendChild(icon);
+    }
+    cell.appendChild(sizes);
+
+    const meta = document.createElement("div");
+    const name = document.createElement("div");
+    name.className = "engine-icon-cell__name";
+    name.textContent = label;
+    meta.appendChild(name);
+    const kind = document.createElement("div");
+    kind.className = "engine-icon-cell__shape";
+    kind.textContent = shape;
+    meta.appendChild(kind);
+    cell.appendChild(meta);
+
+    grid.appendChild(cell);
+  }
+  section.appendChild(grid);
+  return section;
 }
 
 function buildSwatchSection(label, entries) {
@@ -1959,10 +2009,12 @@ function renderConnect(root) {
       card.type = "button";
       card.className = "engine-card";
       if (stepState.engine?.id === engine.id) card.classList.add("is-selected");
-      const dot = document.createElement("span");
-      dot.className = "engine-card__dot";
-      dot.style.setProperty("--engine-color", engine.color);
-      card.appendChild(dot);
+      const icon = createEngineIcon(engine.id, 22);
+      if (icon) {
+        icon.classList.add("engine-card__icon");
+        icon.style.setProperty("--engine-color", engine.color);
+        card.appendChild(icon);
+      }
       const text = document.createElement("div");
       const name = document.createElement("div");
       name.className = "engine-card__name";

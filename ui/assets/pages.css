@@ -211,6 +211,46 @@
   background: var(--bg-surface);
 }
 
+/* 规范页的引擎图标区 */
+.engine-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--sp-3);
+}
+
+.engine-icon-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+}
+
+.engine-icon-cell__sizes {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  flex: none;
+}
+
+.engine-icon-cell .icon--engine {
+  color: var(--engine-color, var(--fg-default));
+}
+
+.engine-icon-cell__name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--fg-default);
+}
+
+.engine-icon-cell__shape {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
 .swatch__chip {
   height: 44px;
   border-bottom: 1px solid var(--border-subtle);
@@ -396,12 +436,9 @@
   margin-top: 2px;
 }
 
-.engine-card__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--r-full);
-  background: var(--engine-color);
+.engine-card__icon {
   flex: none;
+  color: var(--engine-color);
 }
 
 .form-grid {

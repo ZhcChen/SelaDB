@@ -35,6 +35,7 @@ ui/
 │   ├── styles.css        # 组件样式:外壳、树、Tab 栏、数据网格、菜单
 │   ├── pages.css         # 页面级排版:入口页、规范页、连接向导、设置页
 │   ├── icons.js          # 图标系统(内联 SVG,无图标字体)
+│   ├── engine-icons.js   # 六种引擎的专属图标(实心剪影,单色 currentColor)
 │   ├── menu.js           # 轻量菜单
 │   ├── tree.js           # 对象树(任意深度,配置驱动)
 │   ├── datagrid.js       # 数据网格(纯原生自研)

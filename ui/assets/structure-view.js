@@ -667,9 +667,8 @@ class StructureView {
     // 引擎徽标:DDL 的方言由引擎决定,标出来免得看错
     const badge = document.createElement("span");
     badge.className = `engine-badge engine-${this.engine}`;
-    const dot = document.createElement("span");
-    dot.className = "engine-badge__dot";
-    badge.appendChild(dot);
+    const icon = createEngineIcon(this.engine, 13);
+    if (icon) badge.appendChild(icon);
     badge.appendChild(document.createTextNode(ENGINE_LABELS[this.engine] ?? this.engine));
     head.appendChild(badge);
 

@@ -444,9 +444,10 @@ button {
   color: var(--fg-muted);
 }
 
-/* 连接节点的图标用引擎品牌色 —— 树里同时挂着几个引擎时,颜色比图标本身更快认出来 */
-.tree__icon--connection {
-  color: var(--engine-color, var(--fg-default));
+/* 引擎专属图标:实心剪影,颜色跟着 --engine-color 走 */
+.icon--engine {
+  display: block;
+  flex: none;
 }
 
 .tree__label {
@@ -470,6 +471,12 @@ button {
 .tree__node[data-depth="0"] .tree__icon,
 .tree__node[data-depth="1"] .tree__icon {
   color: var(--fg-default);
+}
+
+/* 连接节点用引擎品牌色。
+   必须放在层级权重之后:上面的规则特异性更高,会把品牌色盖成前景色。 */
+.tree__node[data-kind="connection"] .tree__icon--connection {
+  color: var(--engine-color, var(--fg-default));
 }
 
 /* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到 */
@@ -510,15 +517,6 @@ button {
 /* 搜索过滤时整条分支隐藏 */
 .tree__branch.is-hidden {
   display: none;
-}
-
-/* 引擎徽标:连接节点左侧的色条 */
-.tree__engine-dot {
-  width: 4px;
-  height: 14px;
-  border-radius: var(--r-full);
-  background: var(--engine-color, var(--fg-muted));
-  flex: none;
 }
 
 /* -----------------------------------------------------------------------------
@@ -612,11 +610,10 @@ button {
   background: var(--accent);
 }
 
+/* Tab 上的引擎标识:现在是专属图标,不再是短名缩写 */
 .tab__engine {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-wide);
   flex: none;
+  color: var(--engine-color, var(--fg-muted));
 }
 
 .tab__name {
@@ -1294,14 +1291,6 @@ button {
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-wide);
   color: var(--engine-color, var(--fg-muted));
-}
-
-.engine-badge__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--r-full);
-  background: var(--engine-color, var(--fg-muted));
-  flex: none;
 }
 
 /* 引擎色工具类 */
