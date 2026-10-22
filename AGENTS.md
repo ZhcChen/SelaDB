@@ -35,11 +35,22 @@ crates/seladb-core/     领域模型、驱动、查询、服务编排
 crates/seladb-cli/      CLI 入口（clap）
 crates/seladb-mcp/      MCP Server 入口
 crates/seladb-gui/      GUI 入口（gpui）
+crates/gui-core/        自研 GUI 框架（taffy + cosmic-text + wgpu）
+ui/                     UI 设计源（纯 HTML + CSS + JS，不进 Cargo 工作区）
 design/tokens.json      唯一设计源：颜色/间距/字号/圆角/阴影/动效
 docs/                   架构文档与 ADR
 ```
 
 `seladb-core` 内部再分：`core/`（领域模型）、`driver/`（引擎抽象与实现）、`query/`（查询与结果集）、`session/`（连接与凭据）、`service/`（业务逻辑落点）、`config/`（配置加载）。
+
+## UI 设计源（`ui/`）
+
+`ui/` 是**纯静态**的 HTML + CSS + JS 设计源，不进 Cargo 工作区，是后续 Rust 原生实现的视觉与交互基线。
+
+- **零第三方 UI 依赖**：数据网格、对象树、菜单、图标全部自研，视觉完全由 `ui/assets/tokens.css` 控制。
+- `tokens.css` 是唯一设计源，组件样式里不出现裸色值与裸尺寸。
+- 改动设计源后跑 `cd ui && bun run test:smoke`（需先 `bun run dev`），截图落在 `ui/tests/screenshots/` 作为视觉回归基准。
+- 详见 [`ui/README.md`](ui/README.md) 与 [`docs/ui-design-plan.md`](docs/ui-design-plan.md)。
 
 ## 加新引擎时
 

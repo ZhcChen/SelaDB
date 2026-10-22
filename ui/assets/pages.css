@@ -1,0 +1,580 @@
+/* =============================================================================
+ * SelaDB 设计源 —— 页面级样式
+ *
+ * 与 styles.css 分开:styles.css 管组件(外壳、树、网格、菜单),
+ * 这里管「路由页面」的排版(入口页、规范页、连接向导、设置页)。
+ * ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+ * 1. 通用页面容器
+ * -------------------------------------------------------------------------- */
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg-canvas);
+}
+
+.page__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--sp-9) var(--sp-8) var(--sp-9);
+}
+
+.page__head {
+  margin-bottom: var(--sp-7);
+}
+
+.page__eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: var(--sp-3);
+}
+
+.page__title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  margin: 0 0 var(--sp-3);
+  color: var(--fg-default);
+}
+
+.page__lead {
+  font-size: var(--fs-md);
+  line-height: var(--lh-loose);
+  color: var(--fg-muted);
+  max-width: 640px;
+  margin: 0;
+}
+
+.section {
+  margin-bottom: var(--sp-8);
+}
+
+.section__title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  margin: 0 0 var(--sp-2);
+  color: var(--fg-default);
+}
+
+.section__desc {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  margin: 0 0 var(--sp-5);
+  line-height: var(--lh-loose);
+  max-width: 680px;
+}
+
+/* -----------------------------------------------------------------------------
+ * 2. 入口页
+ * -------------------------------------------------------------------------- */
+.entry {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  background: var(--bg-canvas);
+}
+
+.entry__inner {
+  width: 100%;
+  max-width: 860px;
+  padding: var(--sp-9) var(--sp-8);
+}
+
+.entry__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+.entry__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-xl);
+  background: linear-gradient(135deg, var(--accent), var(--engine-mongodb));
+}
+
+.entry__name {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  line-height: 1.1;
+}
+
+.entry__tag {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+
+.entry__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+}
+
+.entry__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-6);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-xl);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.entry__card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.entry__card-title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-default);
+}
+
+.entry__card-desc {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-loose);
+  color: var(--fg-muted);
+}
+
+.entry__card-meta {
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+}
+
+.entry__foot {
+  margin-top: var(--sp-7);
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  line-height: var(--lh-loose);
+}
+
+/* -----------------------------------------------------------------------------
+ * 3. 规范页
+ * -------------------------------------------------------------------------- */
+.swatch-group {
+  margin-bottom: var(--sp-6);
+}
+
+.swatch-group__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--fg-muted);
+  margin-bottom: var(--sp-3);
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--sp-3);
+}
+
+.swatch {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.swatch__chip {
+  height: 44px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.swatch__meta {
+  padding: var(--sp-3);
+}
+
+.swatch__name {
+  font-size: var(--fs-sm);
+  color: var(--fg-default);
+}
+
+.swatch__value {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.spec-table th,
+.spec-table td {
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.spec-table th {
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+}
+
+.spec-table tr:last-child td {
+  border-bottom: none;
+}
+
+.spec-table code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.pill--ok {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: var(--success-border);
+}
+
+.pill--plan {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: var(--info-border);
+}
+
+.pill--later {
+  color: var(--fg-muted);
+  background: var(--bg-inset);
+  border-color: var(--border-default);
+}
+
+/* -----------------------------------------------------------------------------
+ * 4. 连接向导
+ * -------------------------------------------------------------------------- */
+.wizard {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.wizard__steps {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-7);
+}
+
+.wizard__step {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-subtle);
+}
+
+.wizard__step-num {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border-default);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}
+
+.wizard__step.is-active {
+  color: var(--fg-default);
+  font-weight: var(--fw-medium);
+}
+
+.wizard__step.is-active .wizard__step-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.wizard__step.is-done .wizard__step-num {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.wizard__step-sep {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.engine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(216px, 1fr));
+  gap: var(--sp-4);
+}
+
+.engine-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.engine-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.engine-card.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.engine-card__name {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--fg-default);
+}
+
+.engine-card__meta {
+  font-size: var(--fs-xs);
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
+.engine-card__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--engine-color);
+  flex: none;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+}
+
+.form-grid .field--full {
+  grid-column: 1 / -1;
+}
+
+.wizard__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-7);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.wizard__actions-spacer {
+  flex: 1;
+}
+
+.test-result {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+}
+
+.test-result--ok {
+  color: var(--success);
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+}
+
+.test-result--fail {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+}
+
+/* -----------------------------------------------------------------------------
+ * 5. 设置页
+ * -------------------------------------------------------------------------- */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row__label {
+  font-size: var(--fs-base);
+  color: var(--fg-default);
+}
+
+.setting-row__desc {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  margin-top: 2px;
+  line-height: var(--lh-loose);
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+}
+
+.segmented__item {
+  height: 22px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+  border-radius: var(--r-xs);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.segmented__item:hover {
+  color: var(--fg-default);
+}
+
+.segmented__item.is-active {
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  font-weight: var(--fw-medium);
+  box-shadow: var(--shadow-xs);
+}
+
+/* -----------------------------------------------------------------------------
+ * 6. 文档视图(MongoDB)
+ * -------------------------------------------------------------------------- */
+.docs {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-4);
+  background: var(--bg-canvas);
+}
+
+.doc {
+  margin-bottom: var(--sp-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.doc__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+
+.doc__id {
+  color: var(--type-uuid);
+}
+
+.doc__fields {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+}
+
+.doc__field {
+  display: contents;
+}
+
+.doc__key {
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.doc__value {
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-default);
+  border-bottom: 1px solid var(--border-subtle);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc__value--null {
+  color: var(--grid-null-fg);
+  font-style: italic;
+}
+
+.doc__value--nested {
+  color: var(--type-json);
+}
+
+/* -----------------------------------------------------------------------------
+ * 7. 键值列表说明(Redis)
+ * -------------------------------------------------------------------------- */
+.kv-note {
+  padding: var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  line-height: var(--lh-loose);
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  border-radius: var(--r-md);
+  margin-bottom: var(--sp-4);
+}

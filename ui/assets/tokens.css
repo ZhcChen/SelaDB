@@ -1,0 +1,309 @@
+/* =============================================================================
+ * SelaDB 设计 Token
+ *
+ * 唯一设计源。任何颜色、间距、字号、圆角、阴影、动效都必须从这里取值,
+ * 不允许在 styles.css 或组件里写死具体数值。
+ *
+ * 主题跟随系统:JS 读 matchMedia('(prefers-color-scheme: dark)') 把结果写回
+ * <body data-theme>,用户可在设置里显式覆盖。浅色是 :root 上的默认值。
+ *
+ * 密度:密度是数据库工具的刚需 —— 同样 1000 行,紧凑模式能多看一半。
+ * ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+ * 1. 语义色板 —— 浅色(默认值)
+ * -------------------------------------------------------------------------- */
+:root {
+  /* 背景层级:canvas 最底,surface 是面板,raised 是浮层,sunken 是凹陷区 */
+  --bg-canvas: #f2f4f7;
+  --bg-surface: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-sunken: #e9ecf1;
+  --bg-inset: #f7f8fa;
+  --bg-hover: rgba(16, 24, 40, 0.045);
+  --bg-active: rgba(47, 95, 224, 0.1);
+  --bg-selected: #e4edff;
+  --bg-overlay: rgba(16, 24, 40, 0.32);
+
+  /* 边框 */
+  --border-subtle: #e6e9ef;
+  --border-default: #d5dae3;
+  --border-strong: #b8c0cd;
+  --border-focus: var(--accent);
+
+  /* 前景 */
+  --fg-default: #1c2230;
+  --fg-muted: #5f6b7d;
+  --fg-subtle: #8b95a6;
+  --fg-disabled: #b3bac6;
+  --fg-inverse: #ffffff;
+
+  /* 强调色 */
+  --accent: #2f5fe0;
+  --accent-hover: #2450c8;
+  --accent-active: #1c43a8;
+  --accent-soft: #e8efff;
+  --accent-border: #b6c8f5;
+  --accent-fg: var(--fg-inverse);
+
+  /* 语义色 */
+  --danger: #d33b3b;
+  --danger-soft: #fdecec;
+  --danger-border: #f0bcbc;
+  --warning: #c07c14;
+  --warning-soft: #fdf4e3;
+  --warning-border: #ecd3a1;
+  --success: #1f9254;
+  --success-soft: #e7f6ee;
+  --success-border: #a9dcc2;
+  --info: #1673a3;
+  --info-soft: #e6f3f9;
+  --info-border: #a9d3e6;
+
+  /* 网格专用状态 */
+  --grid-stripe: rgba(16, 24, 40, 0.022);
+  --grid-cell-selected: #e4edff;
+  --grid-cell-editing: #ffffff;
+  --grid-header-bg: #f7f8fa;
+  --grid-header-fg: var(--fg-muted);
+  --grid-null-fg: #8b95a6;
+
+  /* 选区与拖拽 */
+  --selection-bg: rgba(47, 95, 224, 0.18);
+  --selection-fg: var(--fg-default);
+}
+
+/* -----------------------------------------------------------------------------
+ * 2. 语义色板 —— 深色
+ * -------------------------------------------------------------------------- */
+body[data-theme="dark"] {
+  --bg-canvas: #0d1017;
+  --bg-surface: #141922;
+  --bg-raised: #1b212c;
+  --bg-sunken: #090c11;
+  --bg-inset: #10141c;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(91, 140, 255, 0.18);
+  --bg-selected: #1c2b4d;
+  --bg-overlay: rgba(0, 0, 0, 0.55);
+
+  --border-subtle: #1e2530;
+  --border-default: #2a323f;
+  --border-strong: #3d4757;
+
+  --fg-default: #dde3ec;
+  --fg-muted: #949eb0;
+  --fg-subtle: #69737f;
+  --fg-disabled: #4b5462;
+
+  --accent: #5b8cff;
+  --accent-hover: #7aa2ff;
+  --accent-active: #9bb8ff;
+  --accent-soft: #16233d;
+  --accent-border: #2f4a80;
+  /* 深色下的强调色偏亮,主按钮改用深色文字,白字对比度不够 */
+  --accent-fg: #0b1220;
+
+  --danger: #ef6a6a;
+  --danger-soft: #2a1618;
+  --danger-border: #5c2a2c;
+  --warning: #e0a53f;
+  --warning-soft: #2a2113;
+  --warning-border: #5c4520;
+  --success: #45c07d;
+  --success-soft: #13251b;
+  --success-border: #2a5439;
+  --info: #4fb3d9;
+  --info-soft: #10222b;
+  --info-border: #26485a;
+
+  --grid-stripe: rgba(255, 255, 255, 0.018);
+  --grid-cell-selected: #1c2b4d;
+  --grid-cell-editing: #10141c;
+  --grid-header-bg: #171d27;
+  --grid-null-fg: #69737f;
+
+  --selection-bg: rgba(91, 140, 255, 0.28);
+}
+
+/* -----------------------------------------------------------------------------
+ * 3. 数据类型色板 —— 数据网格专用
+ *
+ * 数据库工具的信息密度高,类型着色是快速扫读的主要抓手:
+ * 数字一眼认出是数字、NULL 一眼认出是空、时间戳一眼认出是时间。
+ * -------------------------------------------------------------------------- */
+:root {
+  --type-int: #1f6feb;
+  --type-float: #0e7490;
+  --type-string: #1c2230;
+  --type-bool: #1f9254;
+  --type-time: #8250df;
+  --type-null: #8b95a6;
+  --type-binary: #b45309;
+  --type-json: #6f42c1;
+  --type-uuid: #0e7490;
+}
+
+body[data-theme="dark"] {
+  --type-int: #79b8ff;
+  --type-float: #56d4dd;
+  --type-string: #dde3ec;
+  --type-bool: #56d364;
+  --type-time: #d2a8ff;
+  --type-null: #69737f;
+  --type-binary: #ffa657;
+  --type-json: #c297ff;
+  --type-uuid: #56d4dd;
+}
+
+/* -----------------------------------------------------------------------------
+ * 4. 引擎品牌色 —— 六个引擎的识别色
+ *
+ * 品牌色是固定语义,深浅主题只调明度以保证对比度,不换色相。
+ * -------------------------------------------------------------------------- */
+:root {
+  --engine-postgresql: #336791;
+  --engine-mysql: #00758f;
+  --engine-sqlite: #3b7ea1;
+  --engine-sqlserver: #cc2927;
+  --engine-mongodb: #13aa52;
+  --engine-redis: #d82c20;
+}
+
+body[data-theme="dark"] {
+  --engine-postgresql: #7ab8d4;
+  --engine-mysql: #4fc3d9;
+  --engine-sqlite: #79b8e8;
+  --engine-sqlserver: #f2706e;
+  --engine-mongodb: #56d364;
+  --engine-redis: #f2706e;
+}
+
+/* -----------------------------------------------------------------------------
+ * 5. 排版
+ * -------------------------------------------------------------------------- */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC",
+    sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas,
+    "Liberation Mono", "Noto Sans Mono CJK SC", monospace;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+
+  --lh-tight: 1.25;
+  --lh-base: 1.5;
+  --lh-loose: 1.65;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --tracking-wide: 0.04em;
+}
+
+/* -----------------------------------------------------------------------------
+ * 6. 间距、圆角、阴影
+ * -------------------------------------------------------------------------- */
+:root {
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+  --sp-9: 32px;
+
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-xl: 8px;
+  --r-full: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.1), 0 2px 4px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.16), 0 4px 8px rgba(16, 24, 40, 0.08);
+}
+
+body[data-theme="dark"] {
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* -----------------------------------------------------------------------------
+ * 7. 密度
+ *
+ * comfortable 是默认;compact 给密集数据场景。
+ * 行高、缩进、单元格内边距、字号都随密度走。
+ * -------------------------------------------------------------------------- */
+:root,
+body[data-density="comfortable"] {
+  --row-h: 30px;
+  --row-h-sm: 24px;
+  --cell-x: 10px;
+  --indent: 14px;
+  --tree-indent: 14px;
+  --fs-base: 13px;
+  --fs-sm: 12px;
+  --header-h: 32px;
+}
+
+body[data-density="compact"] {
+  --row-h: 24px;
+  --row-h-sm: 20px;
+  --cell-x: 8px;
+  --indent: 12px;
+  --tree-indent: 12px;
+  --fs-base: 12px;
+  --fs-sm: 11px;
+  --header-h: 28px;
+}
+
+/* -----------------------------------------------------------------------------
+ * 8. 布局度量
+ *
+ * 桌面工具的固定高度,给密集信息让位。
+ * -------------------------------------------------------------------------- */
+:root {
+  --h-titlebar: 36px;
+  --h-toolbar: 40px;
+  --h-statusbar: 26px;
+  --h-tabbar: 34px;
+
+  --w-tree: 268px;
+  --w-tree-min: 180px;
+  --w-tree-max: 520px;
+  --w-statusbar-pad: var(--sp-4);
+}
+
+/* -----------------------------------------------------------------------------
+ * 9. 层级与动效
+ * -------------------------------------------------------------------------- */
+:root {
+  --z-sticky: 10;
+  --z-dropdown: 100;
+  --z-overlay: 200;
+  --z-modal: 210;
+  --z-tooltip: 300;
+  --z-toast: 400;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+
+  --ring: 0 0 0 2px var(--accent-soft), 0 0 0 4px var(--accent);
+  --ring-inset: inset 0 0 0 1px var(--accent);
+}
