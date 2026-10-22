@@ -1,5 +1,7 @@
 # 编译速度实测：Go vs Rust
 
+> **本文是 gpui 路线的编译基准，表格数据保留原样。** 当前路线已变更为自研 `crates/gui-core/`（taffy + cosmic-text + wgpu + winit，见 [ADR-0006](adr/0006-self-built-gui-core.md)），其编译量与 wgpu 依赖树同量级，基准**待重测**。
+
 > 2026-10-21 本机实测
 > 环境：macOS 27.0.0 arm64 / Go 1.26.8 / Rust 1.99.0 (cargo 1.99.0) / Apple Silicon
 > 基准项目：两个最小 GUI 应用，功能等价（一个标题 + 一段文字）

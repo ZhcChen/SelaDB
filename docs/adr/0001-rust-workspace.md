@@ -25,7 +25,8 @@ SelaDB/
 │   ├── seladb-core/      # 领域模型、驱动抽象、查询、服务编排
 │   ├── seladb-cli/      # CLI 二进制（clap）
 │   ├── seladb-mcp/      # MCP Server（rmcp）
-│   └── seladb-gui/      # GUI 二进制（gpui）
+│   ├── gui-core/        # 自研 GUI 框架（taffy + cosmic-text + wgpu + winit）
+│   └── seladb-gui/      # GUI 二进制（自研 gui-core）
 └── docs/
 ```
 
@@ -73,7 +74,7 @@ Rust 慢的是**冷编译**，只在新克隆、CI 无缓存、依赖大版本�
 - **学习成本**：团队需要掌握 Rust 的所有权/生命周期心智模型
 - **冷编译慢**：CI 必须配置 cargo 缓存
 - **交叉编译 Windows 需额外工具链**（`x86_64-pc-windows-msvc` 需 Windows 上的 Visual Studio Build Tools，或 `x86_64-pc-windows-gnu` 需 mingw-w64）。Go 是零工具链，这是 Rust 的实质劣势
-- **macOS GUI 构建需 Metal Toolchain 组件**（838.9 MB），CI 的 macOS runner 必须预装
+- ~~**macOS GUI 构建需 Metal Toolchain 组件**（838.9 MB），CI 的 macOS runner 必须预装~~。2026-10-22 更正：自研 gui-core 走 wgpu + naga（纯 Rust 着色器翻译），**不需要**该组件，CI 的 macOS runner 无需预装。它是 gpui/blade 路线的要求，见 [ADR-0006](0006-self-built-gui-core.md)
 - **GPL 边界**：只依赖 Apache-2.0/MIT 的 crate。Zed 的应用层 crate（`ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu`）是 GPL-3.0-or-later 且未发布，一律不用
 - `rusqlite` 的 `bundled` feature 会编译 SQLite 的 C 源码，需要 C 编译器。Rust 本来就需要平台链接器，因此这不构成额外负担（对比 Go 里 CGO 是可选项，一旦引入就破坏交叉编译）
 

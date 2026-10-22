@@ -25,10 +25,10 @@
 
 下面以两个方案的实际源码为对照，给出「哪些 CSS 特性能被 1:1 映射」的边界：
 
-- **GPUI v0.2.2**（当前选定）—— Taffy 0.9 提供 Flexbox + Grid + Block 全套（**无 float**），原生 `BoxShadow` 与 `linear_gradient()`
+- **gpui v0.2.2**（曾作为选定方案实测，路线已变更；本文的还原度数据对 taffy 路线同样成立）—— Taffy 0.9 提供 Flexbox + Grid + Block 全套（**无 float**），原生 `BoxShadow` 与 `linear_gradient()`
 - **Gio v0.10.3**（备选）—— 布局只有 Flex，`op/paint` 与 `op/clip` 里连阴影原语都没有
 
-### 2.1 GPUI v0.2.2 的能力（从源码核实）
+### 2.1 gpui v0.2.2 的能力（从源码核实，现作参考蓝本）
 
 ### 2.2 能 1:1 映射的
 
@@ -49,9 +49,9 @@
 | 系统字体发现 | `zed-font-kit`（Zed 的 font-kit fork，跨平台） | 默认 feature |
 | 文本整形 | `cosmic-text 0.14`（内含 `fontdb` + `rustybuzz`） | macOS / Linux |
 
-**布局这一项是 GPUI 的决定性优势**：Taffy 用的就是浏览器的 CSS 布局算法集，Flexbox / Grid / Block 全部覆盖，语义与浏览器一致。数据表格的经典布局（表头固定 + 主体滚动 + 横向滚动 + 列宽可调）正是 CSS Grid 的典型用法，GPUI 能直接映射，Gio 不能。
+**布局这一项是 Taffy 路线的决定性优势**：Taffy 用的就是浏览器的 CSS 布局算法集，Flexbox / Grid / Block 全部覆盖，语义与浏览器一致。数据表格的经典布局（表头固定 + 主体滚动 + 横向滚动 + 列宽可调）正是 CSS Grid 的典型用法，taffy 能直接映射，Gio 不能。
 
-> **这一条已经实测过**，不是推断：同一棵布局树在 Chromium 与 GPUI 上测出的 70 个几何值**逐位相同**，6 段中英混排文本的宽度**亚像素一致**。数据与复现步骤见 [`fidelity-measurement.md`](fidelity-measurement.md)。
+> **这一条已经实测过**，不是推断：同一棵布局树在 Chromium 与 gpui（其布局层即 Taffy）上测出的 70 个几何值**逐位相同**，6 段中英混排文本的宽度**亚像素一致**。数据与复现步骤见 [`fidelity-measurement.md`](fidelity-measurement.md)。该结论对 taffy 路线同样成立。
 
 **Gio 的对照**：其 `layout/` 下只有 `flex.go` / `stack.go` / `list.go`，**没有 Grid**；`op/paint` 与 `op/clip` 里也**没有任何阴影原语**（material 里唯一的 "shadow" 是 switch 滑块用半透明圆盘近似）。Gio 的文本换行走 go-text/typesetting（HarfBuzz + CSS UAX #14 + bidi），与浏览器同源 —— 这一项它做得好。
 
@@ -132,9 +132,9 @@ resolve Menlo                -> id=1 family=Some(".SFNS-Regular")
 | 圆角只用固定档位 | 如 4 / 8 / 12 |
 | 阴影只用固定档位 | token 定义 offset / blur / spread 三参数 |
 
-> **CSS Grid 不在禁用清单内** —— Taffy 原生支持，这正是选 GPUI 而非 Gio 的关键原因之一。
+> **CSS Grid 不在禁用清单内** —— Taffy 原生支持，这正是选 taffy 路线而非自研布局器的关键原因之一。
 
-这套规则做进 Figma 的组件库和 design token 后，**设计稿天然就落在 GPUI 可映射的子集里**。
+这套规则做进 Figma 的组件库和 design token 后，**设计稿天然就落在 taffy 路线可映射的子集里**。
 
 分维度的可达上限：
 
@@ -185,46 +185,46 @@ gpui 0.2.2 **没有截图 API** —— 无 `platform/visual_test.rs`、无 `scre
 
 SelaDB 的界面主体是数据表格，而**数据表格的经典布局正是 CSS Grid**（表头固定 + 主体纵向滚动 + 横向滚动 + 列宽可调）。
 
-**GPUI 的 Taffy 原生支持 Grid，设计稿可以照常用 CSS Grid 表达，不必降级成 Flex。** 这是选 GPUI 的直接收益 —— 换成 Gio 就只能要么禁用 Grid、要么自建布局器。
+**Taffy 原生支持 Grid，设计稿可以照常用 CSS Grid 表达，不必降级成 Flex。** 这是选 taffy 路线的直接收益 —— 换成自研布局器就只能要么禁用 Grid、要么放弃数据网格的经典布局。
 
-GPUI 官方 `examples/data_table.rs` 给出的实现路线是：表头与 `uniform_list` 平级（表头天然固定），列宽由 `FIELDS` 数组统一定义，可见范围通过 `uniform_list` 的 `range` 回调追踪。
+gpui `examples/data_table.rs`（参考蓝本）给出的实现路线是：表头与 `uniform_list` 平级（表头天然固定），列宽由 `FIELDS` 数组统一定义，可见范围通过 `uniform_list` 的 `range` 回调追踪。
 
-需要自建的增量主要是：列宽拖拽调整（官方示例是固定列宽）、横向滚动与纵向滚动的偏移同步、单元格类型着色（NULL / BLOB / 时间格式）。
+需要自建的增量主要是：列宽拖拽调整（gpui 参考示例是固定列宽）、横向滚动与纵向滚动的偏移同步、单元格类型着色（NULL / BLOB / 时间格式）。
 
 ---
 
 ## 5. 代价清单（诚实版）
 
-即使采用上述做法，以下成本依然存在：
+即使采用上述做法，以下成本依然存在。其中若干项是 gpui 路线的能力缺口，**换成自研 gui-core 后解法已变**，逐行标注如下：
 
 | 成本 | 说明 |
 |---|---|
-| 人工翻译层 | CSS → GPUI 的映射是人工的，没有自动化工具 |
+| 人工翻译层 | CSS → 自研样式层的映射仍是人工的，没有自动化工具 |
 | 像素差异 | 字体光栅化永远不一致，黄金图阈值要留余量（**布局与字宽已实测等价**，见 [`fidelity-measurement.md`](fidelity-measurement.md)） |
-| 抓图链路自建 | gpui 0.2.2 无截图 API，黄金图要靠 `screencapture` 自建链路 |
-| 字体相关断言 | gpui 测试平台无字体，列宽 / 截断 / 换行类断言要放真机端到端 |
-| 交互状态 | CSS 的 `:hover` / `:focus` / `:active` 要逐个映射成 gpui 的 `interactivity` 回调 |
+| 抓图链路自建 | **解法已变**：自研方案按 nanoui 的 Tester 模式提供无头渲染与像素输出，不再依赖 `screencapture` 真机抓图 |
+| 字体相关断言 | **解法已变**：自研字体栈在无头环境加载真实字体，列宽 / 截断 / 换行类断言可进单测 |
+| 交互状态 | **已由自研方案覆盖**：style 层提供 CSS 解析、选择器匹配与级联，`:hover` / `:focus` / `:active` 直接由级联得出，无需逐个映射回调 |
 | 字体回退 | 需确认目标平台的系统中文字体覆盖情况与设计稿一致 |
-| CSS `float` | Taffy 0.9 不支持，设计稿禁用浮动布局 |
-| 列宽拖拽 | 官方示例是固定列宽，拖拽调整需自建 |
+| CSS `float` | Taffy 不支持 float 布局（实测版本 0.9 无 float），设计稿禁用浮动布局 |
+| 列宽拖拽 | gpui 参考示例是固定列宽，拖拽调整需自建 |
 | 双轴滚动同步 | 表头与主体的横向偏移需手动同步 |
-| 滚动容器要显式声明 | `overflow:visible` 的 flex item 有 min-content 地板，翻译时必须给 `overflow_hidden()` / `overflow_scroll()` |
+| 滚动容器要显式声明 | `overflow:visible` 的 flex item 有 min-content 地板，翻译时必须显式给出 `overflow: hidden` / `overflow: scroll` |
 
 ---
 
 ## 6. 与 Web 路线的对比（同一张设计稿）
 
-| 维度 | 原生（GPUI） | Web（系统 webview） |
+| 维度 | 原生（自研 gui-core） | Web（系统 webview） |
 |---|---|---|
 | 视觉等价度 | 布局与字宽**实测等价**，栅格化有差异（约束设计规范后） | 100% |
 | 像素一致 | 不可能 | 也不保证（跨浏览器仍有差异） |
-| 黄金图回归 | ⚠️ 需自建抓图链路（gpui 无截图 API） | ✅ 浏览器截图，直接可用 |
+| 黄金图回归 | ⚠️ 需自建无头渲染与像素回归 | ✅ 浏览器截图，直接可用 |
 | 设计约束 | 必须禁用 滤镜 / 混合模式 / 伪元素 / float | 无 |
 | 产物体积 | 10–20MB | 10–20MB |
 | 内存占用 | 低 | 中（浏览器渲染进程） |
 | 启动速度 | 快 | 中 |
 | 语言栈 | 纯 Rust | Go + Web |
-| 中文 IME | 协议级完整实现 ✅ | 天然正确 ✅ |
+| 中文 IME | 协议级完整实现 ✅（自研路线待实现） | 天然正确 ✅ |
 
 **结论：两条路都能做到「人眼分辨不出」的还原度。** 差别在于原生路线要你接受一份「禁用清单」，Web 路线不用。
 

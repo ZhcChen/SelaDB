@@ -18,7 +18,7 @@ Go 时代的约束是 `CGO_ENABLED=0`：一旦引入 cgo 依赖，Windows 交叉
 |---|---|---|
 | `seladb-core`（驱动、查询、服务） | 仅 `rusqlite` 的 `bundled` feature 会编译 SQLite C 源码 | 需要 C 编译器；Rust 本身也需要平台链接器，故不构成额外负担 |
 | `seladb-cli` / `seladb-mcp` | 同上 | **纯 Rust + 平台链接器**。交叉编译 Windows 需 `x86_64-pc-windows-msvc`（需 Windows 上的 Visual Studio Build Tools）或 `x86_64-pc-windows-gnu`（需 mingw-w64） |
-| `seladb-gui` | 无（blade-graphics 是纯 Rust 绑定 Metal / Vulkan / DX12） | macOS 需 **Metal Toolchain 组件**；Windows 需 MSVC；Linux 需 X11 / xkbcommon / Vulkan 驱动 |
+| `seladb-gui` | 无（wgpu 走 naga 纯 Rust 着色器翻译；taffy / cosmic-text 均为纯 Rust） | macOS **无需** Metal Toolchain 组件；Windows 需 MSVC；Linux 需 X11 / xkbcommon / Vulkan 驱动 |
 
 **具体替代选择**：
 
@@ -38,7 +38,7 @@ Go 时代的约束是 `CGO_ENABLED=0`：一旦引入 cgo 依赖，Windows 交叉
 ## 后果
 
 - **交叉编译 Windows 需要额外一道工序**。这是 Rust 相对 Go 的实质劣势 —— Go 是 `GOOS=windows go build` 一条命令零工具链。缓解：CLI/MCP 的 Windows 包可以用 Windows runner 原生构建，不必依赖 macOS 交叉编译
-- **~~macOS GUI 构建在干净的 CI runner 上会失败，除非预装 Metal Toolchain~~**。2026-10-22 修订：自研 gui-core 走 wgpu + naga，不再需要 Metal Toolchain，干净的 macOS runner 可直接构建
+- **macOS GUI 构建在干净的 CI runner 上可直接通过**。2026-10-22 修订：自研 gui-core 走 wgpu + naga，不再需要预装 Metal Toolchain
 - **`rusqlite` 需要 C 编译器**。CI 的 Linux runner 通常自带 gcc；Windows runner 自带 MSVC；macOS runner 需 Xcode CLT（Rust 工具链已要求）
 - **不再有 `CGO_ENABLED=0` 这个环境变量层面的护栏**。取而代之的是 crate 边界 —— GUI 的重依赖不污染 CLI/MCP 的构建
 

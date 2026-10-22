@@ -172,7 +172,7 @@ class DataView {
 | `tokens.css` | `crates/seladb-gui` 的主题模块;取值一一对应 |
 | 数据类型色板 | 驱动的类型分类 → 渲染时选色 |
 | 引擎树规格 | `seladb-core` 驱动能力声明 |
-| `DataGrid` | GPUI/自研框架里的表格控件 |
+| `DataGrid` | 自研框架里的表格控件 |
 | `query-editor.js` | `tree-sitter-sql` + 自研着色层 |
 | 布局度量 | 固定高度 token 对应常量 |
 

@@ -1,8 +1,14 @@
 # GUI 框架全景对比
 
+> **调研已完成，最终路线见 [ADR-0006](adr/0006-self-built-gui-core.md)。**
+>
+> 2026-10-22 拍板的路线是**自研 `crates/gui-core/`**（taffy + cosmic-text + wgpu + winit + accesskit），gpui 与 nanoui 只作参考蓝本，不作为依赖引入。
+>
+> 本文的候选横向对比**仍然有效并作为参考保留**；文中「结论」「我的建议」等措辞描述的是**当时的判断**，不代表当前路线。当前路线见 [`gui-framework-comparison.md`](gui-framework-comparison.md) 与 [`adr/0006-self-built-gui-core.md`](adr/0006-self-built-gui-core.md)。
+
 > 状态：2026-10-21 调研快照
 > 目的：完整列出 Go 与 Rust 生态的跨平台原生 GUI 方案，给出 SelaDB 的选型依据
-> 关联：[`gui-architecture.md`](gui-architecture.md)（Gio 方案细节）、[`adr/0004-ui-stack.md`](adr/0004-ui-stack.md)
+> 关联：[`gui-architecture.md`](gui-architecture.md)（Gio 方案细节）、[`adr/0004-ui-stack.md`](adr/0004-ui-stack.md)（已被 ADR-0006 取代）、[`adr/0006-self-built-gui-core.md`](adr/0006-self-built-gui-core.md)（当前路线）
 
 本文所有版本与状态均于 2026-10-21 从上游仓库核实（Go module proxy / crates.io / GitHub 源码）。
 
@@ -454,7 +460,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 ---
 
-## 5. 结论
+## 5. 结论（当时的调研结论）
 
 ### 5.1 回答「Go 里只有 Gio 合适吗」
 
@@ -467,7 +473,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 
 **Gio 仍然是「全 Go + 原生 GPU + 靠谱中文输入」三项同时满足的唯一方案。**
 
-### 5.1.1 GPUI：经过实测后，是原生方案里的最优解
+### 5.1.1 GPUI：经过实测后，是原生方案里的最优解（当时的判断）
 
 此前对 GPUI 的两条否定理由经核实后都不成立：
 
@@ -476,7 +482,7 @@ use: xcodebuild -downloadComponent MetalToolchain
 | 「组件库 GPL-3.0 且未发布 → 不可用」 | **gpui 本体 Apache-2.0，全部依赖已发布，可完全独立使用**（已实测构建成功）。GPL-3.0 只影响 Zed 的应用层组件库，而那些组件本就是按 Zed 设计语言做的，数据库工具也要自己的；官方 `data_table.rs` 参考实现就在 Apache-2.0 的 crate 内 |
 | 「与 Zed 绑定 → 版本比 Gio 更不稳定」 | **反了**。gpui 0.2.0/0.2.1/0.2.2 全发布于 2025-10，之后一年无新版本 —— 一年一版、可以正常锁版本。Gio 才是「0.x 每次 minor 破坏 + 不回移 bugfix + 必须跟 main」 |
 
-修正后 GPUI 的优势是全部候选里最完整的：
+修正后（当时认为）GPUI 的优势是全部候选里最完整的：
 
 - **Taffy = 浏览器同源的 Flexbox + Grid + Block 全套** → 唯一能直接映射 CSS Grid 的方案（实测几何等价）
 - **官方 473 行数据表参考实现**（Apache-2.0）→ 固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条
@@ -494,9 +500,9 @@ use: xcodebuild -downloadComponent MetalToolchain
 - ✅ **Slint 可以** —— 真正原生 GPU 渲染（Skia），桌面端中文 IME 可用，版本稳定（1.18.1）且有商业支持
 - ⚠️ **Tauri** —— IME 完美、组件生态最好，但那是 WebView 路线，与「原生 GPU 渲染」的需求冲突；且 Tauri v3 还在 alpha
 
-### 5.3 我的建议
+### 5.3 我的建议（当时）
 
-**经源码核实与实测，最终结论：Rust + GPUI。**
+**经源码核实与实测，当时的结论：Rust + GPUI。**（该结论已被 [ADR-0006](adr/0006-self-built-gui-core.md) 取代 —— 最终路线是**自研 `crates/gui-core/`**，gpui 与 nanoui 只作参考蓝本。下表是当时的横向比较，调研数据本身仍然有效。）
 
 理由汇总（全部有实测或源码依据）：
 

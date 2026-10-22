@@ -1,6 +1,6 @@
 # SelaDB 架构与技术选型
 
-> 状态：2026-10-21 定稿
+> 状态：2026-10-22 更新（GUI 路线改为自研 gui-core，见 [ADR-0006](adr/0006-self-built-gui-core.md)）
 > 定位：跨平台（Windows / macOS / Linux）数据库管理软件
 > 关键约束：**全项目 Rust**、**核心库不感知 UI 与引擎**、**只依赖宽松许可证**
 
@@ -27,7 +27,7 @@ SelaDB 采用「一个核心，多种外壳」的结构。核心库负责所有�
             │                       │                       │
     ┌───────▼────────┐    ┌─────────▼─────────┐    ┌────────▼────────┐
     │ seladb-cli     │    │  seladb-gui       │    │  seladb-mcp     │
-    │  clap          │    │  gpui             │    │  rmcp           │
+    │  clap          │    │  gui-core         │    │  rmcp           │
     │  --json 输出    │    │  Metal/D3D12/     │    │  核心操作→工具   │
     │                │    │  Vulkan 原生渲染   │    │                 │
     └───────┬────────┘    └─────────┬─────────┘    └────────┬────────┘
@@ -50,13 +50,13 @@ SelaDB 采用「一个核心，多种外壳」的结构。核心库负责所有�
 
 | 用途 | 选型 | 版本 | 理由 |
 |---|---|---|---|
-| GUI 框架 | `gpui` | 0.2.2 | Taffy 0.9 与浏览器同源（Flexbox+Grid+Block，**无 float**）；Metal / D3D12 / Vulkan；Apache-2.0 且全部依赖已发布；**实测可独立构建**（产物 5.6M）；**布局与字宽与 Chromium 实测等价** |
-| GUI 组件 | 自建，参考官方 `examples/data_table.rs` | — | 官方提供 473 行数据表参考实现：固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条 + 可见范围追踪 |
+| GUI 框架 | **自研 `crates/gui-core/`**（taffy + cosmic-text + wgpu + winit） | — | 布局 taffy 0.15（**不锁版本**），Taffy 与浏览器同源（Flexbox+Grid+Block，**无 float**）；文本 cosmic-text 0.19（HarfBuzz 级整形 + UAX#14 中文断行）；渲染 wgpu 30.0.1（Metal / D3D12 / Vulkan 三平台统一后端）；**布局与字宽与 Chromium 的等价性已在 taffy 0.9 上实测**（0.000px，跨一个大版本后需重测）。决策见 [ADR-0006](adr/0006-self-built-gui-core.md) |
+| GUI 组件 | 自建，参考 gpui `examples/data_table.rs` 与 nanoui 的无头 Tester | — | gpui 提供 473 行数据表参考实现（固定表头 + `uniform_list` 虚拟化 + 列宽 + 截断 + 自定义滚动条 + 可见范围追踪）；组件全部自建 |
 | 语法高亮 | `tree-sitter` + `tree-sitter-sql` | — | 增量解析，可拿语法树做表名/列名跳转 |
 | CLI 框架 | `clap` | 4.6.7 | 事实标准 |
 | MCP | `rmcp`（官方 Rust SDK） | 3.6.0 | 协议演进有保障 |
 
-> **GPUI 的能力边界**：原生支持 Flexbox / Grid / 绝对定位 / 盒模型 / `BoxShadow` / `linear_gradient()` / 透明度 / SVG / 矢量路径 / 文本整形。**不支持** CSS 滤镜、混合模式、元素级毛玻璃（仅窗口级 vibrancy）、伪元素、复杂 mask —— 这些要进设计规范的禁用清单，见 [`docs/ui-fidelity.md`](ui-fidelity.md)。
+> **Taffy / wgpu 路线的能力边界**：原生支持 Flexbox / Grid / 绝对定位 / 盒模型（taffy）、阴影 / 渐变 / 透明度 / SVG / 矢量路径（wgpu + 自研绘制层）、文本整形与断行（cosmic-text）。**不支持** CSS 滤镜、混合模式、元素级毛玻璃、伪元素、复杂 mask —— 这些要进设计规范的禁用清单，见 [`docs/ui-fidelity.md`](ui-fidelity.md)。
 
 ### 2.2 MCP 与协议层
 
@@ -107,7 +107,8 @@ SelaDB/
 │   │   └── tests/
 │   ├── seladb-cli/          # CLI 二进制（clap）
 │   ├── seladb-mcp/          # MCP Server 二进制（rmcp）
-│   └── seladb-gui/          # GUI 二进制（gpui）
+│   ├── gui-core/            # 自研 GUI 框架（taffy + cosmic-text + wgpu + winit）
+│   └── seladb-gui/          # GUI 二进制（自研 gui-core）
 ├── design/
 │   ├── tokens.json          # 唯一设计源：颜色/间距/字号/圆角/阴影/动效
 │   └── screenshots/         # 设计稿导出 PNG（黄金图基准）
@@ -127,7 +128,7 @@ SelaDB/
 - `seladb-core` 内部按职责分模块，对外只暴露 `service` 层
 - `service` 层是**唯一的业务逻辑落点**。CLI 命令、GUI 视图、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不含业务判断
 - `driver` 层只做「把引擎的原生语义翻译成核心抽象」，不做业务编排
-- `gpui` 的调用**收敛在 `seladb-gui` crate 内**，不外泄到 `core` / `driver` / `service`
+- `gui-core` 的调用**收敛在 `seladb-gui` crate 内**，不外泄到 `core` / `driver` / `service`
 - crate 边界是编译期强制的，不需要靠目录约定自律
 
 ---
@@ -180,7 +181,7 @@ impl Service {
 
 - CLI：`seladb tables --conn prod --json` → 调 `list_tables` → JSON 编码
 - MCP：工具 `list_tables` → 调 `list_tables` → JSON 编码（几乎同构）
-- GUI：直接调 `list_tables` → 拿到领域类型 → gpui 渲染
+- GUI：直接调 `list_tables` → 拿到领域类型 → gui-core 渲染
 
 ### 4.3 结果集统一模型
 
@@ -265,11 +266,11 @@ description: 查询 SelaDB 中已配置的数据库连接。当用户提到某�
 
 **交叉编译到 Windows 需要额外一道工序**（Rust 需要平台链接器），这是 Rust 相对 Go 的实质劣势。缓解：CLI/MCP 的 Windows 包可以用 Windows runner 原生构建，不必依赖 macOS 交叉编译。
 
-### 7.2 GUI（gpui）
+### 7.2 GUI（自研 gui-core）
 
 | 目标平台 | 构建方式 | 额外依赖 |
 |---|---|---|
-| macOS arm64 / amd64 | macOS runner 原生构建 | **Metal Toolchain 组件**（`xcodebuild -downloadComponent MetalToolchain`，838.9 MB） |
+| macOS arm64 / amd64 | macOS runner 原生构建 | 无（wgpu 走 naga 纯 Rust 着色器翻译，**不需要 Metal Toolchain**） |
 | Windows amd64 / arm64 | Windows runner 原生构建 | 无（MSVC 工具链自带） |
 | Linux amd64 / arm64 | Linux 容器构建 | `libx11`、`libxkbcommon`、Vulkan 驱动 |
 
@@ -280,7 +281,7 @@ description: 查询 SelaDB 中已配置的数据库连接。当用户提到某�
 ```
 tag 触发
   ├─ 矩阵构建 CLI/MCP：6 个目标（cargo，交叉编译）
-  └─ 矩阵构建 GUI：macOS runner（预装 Metal Toolchain）+ Windows runner + Linux 容器
+  └─ 矩阵构建 GUI：macOS runner（无需 Metal Toolchain）+ Windows runner + Linux 容器
 ```
 
 ---
@@ -289,14 +290,14 @@ tag 触发
 
 | 风险 | 影响 | 应对 |
 |---|---|---|
-| **macOS 缺 Metal Toolchain** | GUI 构建直接失败 | 一次性安装；CI macOS runner 预装并检查 |
+| **macOS Metal Toolchain** | 仅 gpui / blade 渲染后端需要 | 当前自研 wgpu 路线**不需要**，CI macOS runner 无需预装；若将来引入 blade / gpui 后端则需一次性安装（838.9 MB） |
 | **Windows 交叉编译需链接器工具链** | 与跨平台目标冲突 | Windows 包用 Windows runner 原生构建 |
-| **冷编译慢**（gpui 约 76s） | CI 慢 | 配 cargo 缓存；日常增量 0.99s 可接受 |
-| **gpui 由 Zed 单方面演进** | API 可能破坏 | 锁版本、按季评估升级（一年一版，升级频率天然低） |
-| **gpui 独立生态规模小**（38 万下载） | 第三方参考资料少 | 官方示例质量高；组件自建为主 |
-| **设计稿无法 100% 像素复刻** | 还原度打折 | 约束设计规范 + design token + 黄金图回归，见 [`ui-fidelity.md`](ui-fidelity.md)；布局与字宽已实测等价，见 [`fidelity-measurement.md`](fidelity-measurement.md) |
-| **gpui 无截图 API** | 黄金图回归缺现成能力 | 自建抓图链路（真机窗口 + `screencapture`） |
-| **gpui 测试平台无字体** | 字体相关断言无法进单测 | 列宽 / 截断 / 换行类断言放真机端到端测试 |
+| **冷编译慢**（wgpu 依赖树编译量大，基准待重测） | CI 慢 | 配 cargo 缓存；日常增量不受影响 |
+| **自研框架的 API 稳定性由自己负责** | 组件层可能受影响 | 框架内部 API 收敛在 `gui-core`，公开 API 不泄漏第三方类型 |
+| **自研框架无第三方生态** | 参考实现与现成方案少 | 以 nanoui（无头 Tester）与 gpui 示例为蓝本；组件全部自建 |
+| **设计稿无法 100% 像素复刻** | 还原度打折 | 约束设计规范 + design token + 黄金图回归，见 [`ui-fidelity.md`](ui-fidelity.md)；布局与字宽的等价性已在 taffy 0.9 上实测（升级到 0.15 后需重测），见 [`fidelity-measurement.md`](fidelity-measurement.md) |
+| **无头渲染与截图能力需自建** | 黄金图回归缺现成能力 | 按 nanoui 的 Tester 模式自建无头渲染与像素回归，见 [`gui-framework-comparison.md`](gui-framework-comparison.md) |
+| **无头环境的字体度量** | 字体相关断言可能受限 | 自研字体栈在无头环境加载真实字体，使列宽 / 截断 / 换行类断言可进单测 |
 | **Oracle 驱动成熟度** | 特性覆盖有限 | 列为「尽力而为」支持等级，不承诺完整 SQL 方言 |
 | **rusqlite 需 C 编译器** | 构建环境要求 | Rust 本就需要平台链接器，不构成额外负担 |
 
@@ -307,7 +308,7 @@ tag 触发
 以下尚未决策，需要在对应功能开工前确定：
 
 - **GUI 主题**：深色为主还是深浅双主题
-- **字体**：gpui 默认走系统字体（`font-kit`），是否额外内置一套保证跨平台一致
+- **字体**：自研字体栈走 cosmic-text 的字体发现（系统字体优先），是否额外内置一套保证跨平台一致
 - **首批支持的引擎**：建议 Postgres + MySQL + SQLite 起步
 - **凭据存储的具体实现**：`keyring` 各平台的 Go/Rust 绑定差异
 - **SQL 解析库**：tree-sitter 方案（与编辑器一致，可拿语法树）还是 TextMate/syntect 方案

@@ -1,17 +1,27 @@
 # GUI 方案：GPUI
 
-> 状态：2026-10-21 定稿
-> 关联：ADR-0004（界面栈选型）、ADR-0002（CGO 边界）、[`gui-framework-survey.md`](gui-framework-survey.md)（全景对比）、[`compile-benchmarks.md`](compile-benchmarks.md)（实测数据）
+> **本文已被 [ADR-0006](adr/0006-self-built-gui-core.md) 取代（2026-10-22）。**
 >
-> **决策沿革**：初版 Wails v2 + Web 前端 → 因需求改为「原生 GPU 渲染」转向 Gio → 经源码核实与实测转向 **GPUI**。详见 ADR-0004 的决策沿革。
+> 当前路线是**自研 `crates/gui-core/`**（taffy + cosmic-text + wgpu + winit + accesskit）；gpui 与 nanoui 降级为**只读参考蓝本**，不作为依赖引入。
+>
+> 本文记录的是 gpui 路线的调研、依赖核实与实测，**这些数据与结论仍然有效并作为参考保留**（尤其是 Taffy 与浏览器同源、逐平台 IME 协议细节、`examples/data_table.rs` 数据表蓝本、实测数据）。但文中「结论」「为什么是」这类措辞描述的是**当时的判断**，不代表当前路线。
+>
+> 特别注意：文中的构建前置（如「macOS 必须安装 Metal Toolchain」）是 **gpui / blade 渲染后端**的要求，当前自研 wgpu 路线**不再需要**，CI 的 macOS runner 也不必预装（见 `AGENTS.md` 硬约束 7）。
+>
+> 当前路线见 [`gui-framework-comparison.md`](gui-framework-comparison.md)（逐层对比与借鉴清单）与 [`adr/0006-self-built-gui-core.md`](adr/0006-self-built-gui-core.md)（决策与理由）。
+
+> 状态：2026-10-21 定稿（已被 ADR-0006 取代，转为历史调研记录）
+> 关联：ADR-0004（界面栈选型）、ADR-0006（界面栈选型，自研 gui-core）、ADR-0002（CGO 边界）、[`gui-framework-survey.md`](gui-framework-survey.md)（全景对比）、[`compile-benchmarks.md`](compile-benchmarks.md)（实测数据）
+>
+> **决策沿革**：初版 Wails v2 + Web 前端 → 因需求改为「原生 GPU 渲染」转向 Gio → 经源码核实与实测转向 **GPUI**（2026-10-21）→ 2026-10-22 经 ADR-0006 转向**自研 gui-core**。详见 ADR-0004 的决策沿革。
 
 本文聚焦 GUI 客户端。核心库、CLI、MCP Server 的选型见 [`architecture.md`](architecture.md)。
 
 ---
 
-## 1. 结论
+## 1. 结论（当时的）
 
-**GUI 用 `gpui`（Zed 的框架）v0.2.2，Apache-2.0，可脱离 Zed 仓库独立使用。**
+**（当时的选定，已被 ADR-0006 取代）GUI 用 `gpui`（Zed 的框架）v0.2.2，Apache-2.0，可脱离 Zed 仓库独立使用。**
 
 | 平台 | 渲染后端 |
 |---|---|
@@ -23,7 +33,7 @@
 
 ---
 
-## 2. 为什么是 GPUI
+## 2. 为什么是 GPUI（当时的论证）
 
 ### 2.1 布局层与浏览器同源
 
@@ -237,11 +247,11 @@ gpui 本身不含语法高亮。两种选择：
 
 ## 7. 还原度策略
 
-GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原生方案里最高的。
+Taffy 与浏览器同源，所以布局还原度天花板是所有原生方案里最高的 —— **该结论对当前的 taffy 路线同样成立**。
 
 **这一点已经实测过**（见 [`fidelity-measurement.md`](fidelity-measurement.md)）：同一棵布局树在 Chromium 与 GPUI 上的 70 个几何测量值**逐位相同（最大偏差 0.000px）**，6 段中英混排文本的排版宽度**亚像素一致（最大偏差 0.014px）**。
 
-**设计规范禁用清单**（Taffy / gpui 不支持或不等价的）：
+**设计规范禁用清单**（Taffy / wgpu 路线不支持或不等价的）：
 
 | 禁用 | 原因 | 替代 |
 |---|---|---|
@@ -252,7 +262,7 @@ GPUI 的 Taffy 与浏览器同源，所以布局还原度天花板是所有原�
 | `::-webkit-scrollbar` | 无自定义滚动条 | 自行绘制（官方示例已有） |
 | CSS 缓动曲线 | 只有 spring 动画 | 弹簧参数预设档位 |
 
-**不被禁用**（gpui 原生支持）：Flexbox、Grid、绝对定位、盒模型、圆角、边框、阴影、渐变、透明度、SVG 图标、矢量路径、文本整形与换行。
+**不被禁用**（当前路线原生支持）：Flexbox、Grid、绝对定位、盒模型、圆角、边框、阴影、渐变、透明度、SVG 图标、矢量路径、文本整形与换行。
 
 ### 7.1 黄金图回归
 
@@ -298,9 +308,11 @@ gpui 0.2.2 **没有截图 API**（无 `visual_test.rs`、无 `screenshot()`、�
 | 产物体积 | **5.6M** | 8.9M |
 | 语言栈 | 单一 Rust | 单一 Go |
 
-**结论：两者各有胜负，但 GPUI 在「原生 GUI 能力」这一侧优势明显，而 Go 的优势（编译速度）经实测只在冷编译体现。**
+**结论（当时的）：两者各有胜负，但 GPUI 在「原生 GUI 能力」这一侧优势明显，而 Go 的优势（编译速度）经实测只在冷编译体现。**
 
-如果「还原度 + 原生 GPU」是硬需求 → **GPUI**。
+**这条结论已被 [ADR-0006](adr/0006-self-built-gui-core.md) 取代**：最终路线不是「Rust + gpui」，而是**自研 `crates/gui-core/`**（taffy + cosmic-text + wgpu + winit + accesskit），gpui 与 nanoui 只作参考蓝本。上文对 gpui 的能力核实与实测仍然成立，其中 Taffy 与 cosmic-text 这两层被自研方案直接继承。
+
+如果「还原度 + 原生 GPU」是硬需求 → **GPUI**（当时的判断）。
 如果「零构建摩擦 + 三平台一键交叉编译」是硬需求 → Go + Gio，但表格与 Grid 要自建。
 
 ---

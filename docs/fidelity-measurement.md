@@ -1,5 +1,9 @@
 # 还原度实测：GPUI v0.2.2 vs Chromium
 
+> **本文是 gpui 路线下的实测记录；路线已于 2026-10-22 变更**（见 [ADR-0006](adr/0006-self-built-gui-core.md)，当前为自研 `crates/gui-core/`）。
+>
+> 正文数据一个字未动，且仍然有效：其中「**Taffy 与浏览器同源 → 几何逐位相同**」这一结论对 taffy 0.15 依然成立 —— 测的就是 Taffy 的布局实现，gpui 只是当时的宿主。文中 gpui 的 API 细节仅作历史记录。
+
 > 状态：2026-10-21 实测完成
 > 目的：把「GPUI 能不能 1:1 复刻 Web 设计稿」从论证变成可复现的数据
 > 关联：[`ui-fidelity.md`](ui-fidelity.md)、[`gui-architecture.md`](gui-architecture.md)、[ADR-0004](adr/0004-ui-stack.md)

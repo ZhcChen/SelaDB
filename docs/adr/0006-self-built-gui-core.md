@@ -100,7 +100,7 @@ nanoui（`justrach/nanoui`，MIT）是 GPUI 架构的 Zig 移植，做得很漂�
 - IME、平台胶水、绘制命令编码、命中测试、焦点管理全部自己扛，约占框架代码量的 20–30%。
 - 中文 IME 三平台一致性是最难的部分，需按 macOS → Wayland → Windows 排期，或借 accesskit 统一。
 - 数据网格的变高行 + 异构列虚拟化比等高列表难一个数量级。
-- macOS 构建需 Metal Toolchain 组件（838.9 MB），CI runner 必须预装。
+- ~~macOS 构建需 Metal Toolchain 组件（838.9 MB），CI runner 必须预装~~。2026-10-22 更正：自研路线走 wgpu + naga（WGSL→MSL 纯 Rust 翻译），**不需要**该组件，CI 的 macOS runner 不必预装。它是 gpui/blade 路线的要求。
 
 **中性**
 
