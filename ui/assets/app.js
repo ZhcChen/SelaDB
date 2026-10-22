@@ -7,8 +7,12 @@ import {
   UI_COPY,
 } from "./mock-data.js";
 import { DataGrid } from "./datagrid.js";
+import { DocumentTree } from "./document-tree.js";
 import { TreeView } from "./tree.js";
-import { createIcon } from "./icons.js";
+import { CommandPalette } from "./command-palette.js";
+import { QueryEditor } from "./query-editor.js";
+import { executeQuery, splitStatements } from "./mock-sql.js";
+import { createIcon, iconForKind } from "./icons.js";
 import { openMenu } from "./menu.js";
 
 /* =============================================================================
@@ -48,6 +52,8 @@ const state = {
   grid: null,
   /** 当前挂载的数据视图,切 Tab 时要 destroy */
   view: null,
+  /** 命令面板,挂在 body 上,跨路由常驻 */
+  palette: null,
   shell: null,
   density: "comfortable",
   theme: "system",
@@ -268,7 +274,7 @@ function shiftTimestamp(value, minutes) {
   return value.includes("T") ? stamp.replace(" ", "T") : stamp;
 }
 
-/** MongoDB 文档 —— 嵌套结构用 JSON 呈现,不做列化。 */
+/** MongoDB 文档 —— 嵌套结构用可折叠的树呈现,不做列化。 */
 class DocumentDataView extends DataView {
   constructor(ctx) {
     super(ctx);
@@ -279,13 +285,13 @@ class DocumentDataView extends DataView {
     body.className = "panel__body";
     this.element.appendChild(body);
 
-    const list = document.createElement("div");
-    list.className = "docs";
-    body.appendChild(list);
+    this.tree = new DocumentTree(documents);
+    this.tree.mount(body);
+  }
 
-    for (const doc of documents) {
-      list.appendChild(buildDocument(doc));
-    }
+  destroy() {
+    this.tree?.destroy();
+    super.destroy();
   }
 }
 
@@ -303,7 +309,8 @@ class KeyValueListView extends DataView {
     this.grid = new DataGrid({
       columns: [
         { key: "key", name: "key", type: "varchar(128)", width: 280 },
-        { key: "type", name: "type", type: "varchar(16)", width: 120 },
+        // 这一列的值本身就是 string / hash / list,再标一次 varchar 反而挤掉列名
+        { key: "type", name: "type", width: 110 },
         { key: "ttl", name: "ttl", type: "int", width: 100 },
         { key: "size", name: "size", type: "int", width: 100 },
         { key: "preview", name: "value", type: "text", width: 320 },
@@ -408,49 +415,6 @@ function buildEmpty(title, desc) {
   return empty;
 }
 
-function buildDocument(doc) {
-  const card = document.createElement("div");
-  card.className = "doc";
-
-  const head = document.createElement("div");
-  head.className = "doc__head";
-  const id = document.createElement("span");
-  id.className = "doc__id";
-  id.textContent = String(doc._id ?? "");
-  head.appendChild(id);
-  card.appendChild(head);
-
-  const fields = document.createElement("div");
-  fields.className = "doc__fields";
-  for (const [key, value] of Object.entries(doc)) {
-    if (key === "_id") continue;
-
-    const row = document.createElement("div");
-    row.className = "doc__field";
-
-    const k = document.createElement("div");
-    k.className = "doc__key";
-    k.textContent = key;
-    row.appendChild(k);
-
-    const v = document.createElement("div");
-    v.className = "doc__value";
-    if (value === null || value === undefined) {
-      v.classList.add("doc__value--null");
-      v.textContent = "null";
-    } else if (typeof value === "object") {
-      v.classList.add("doc__value--nested");
-      v.textContent = JSON.stringify(value);
-    } else {
-      v.textContent = String(value);
-    }
-    row.appendChild(v);
-
-    fields.appendChild(row);
-  }
-  card.appendChild(fields);
-  return card;
-}
 
 function button(label, { icon, className = "btn", onClick, title } = {}) {
   const el = document.createElement("button");
@@ -488,6 +452,10 @@ function buildTitlebar() {
   input.type = "text";
   input.placeholder = "搜索对象或执行命令";
   input.setAttribute("aria-label", "全局搜索");
+  // 真正的输入在命令面板里,这里只是个入口
+  input.readOnly = true;
+  input.addEventListener("focus", () => state.palette?.open());
+  input.addEventListener("click", () => state.palette?.open());
   search.appendChild(input);
   const hint = document.createElement("span");
   hint.className = "titlebar__search-hint";
@@ -724,16 +692,48 @@ function openTabForNode(node) {
   renderWorkspace();
 }
 
-function openQueryTab() {
-  const connection = CONNECTIONS[0];
+/** 查询示例:正常的一条,能在 mock 里跑出结果集。 */
+const SAMPLE_SQL = `-- 用户订单概览:按状态统计
+SELECT u.id,
+       u.name,
+       u.status,
+       COUNT(o.id) AS orders
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE u.status = 'active'
+GROUP BY u.id, u.name, u.status
+ORDER BY orders DESC
+LIMIT 100;
+`;
+
+/** 查询示例:故意写错的一张表,用来演示错误定位。 */
+const SAMPLE_SQL_ERROR = `-- 这条会失败:order_total 这张表不存在
+SELECT o.id, o.amount
+FROM order_total o
+WHERE o.amount > 100;
+`;
+
+/** 走 SQL 的引擎。Redis 是 KV,没有查询编辑器。 */
+const RELATIONAL_ENGINES = new Set(["postgresql", "mysql", "sqlite", "sqlserver"]);
+
+function openQueryTab(connection = null) {
+  // 查询 Tab 继承当前 Tab 的连接;没有当前 Tab 时用第一个关系型连接
+  const active = state.tabs.find((tab) => tab.id === state.activeTabId);
+  let target = connection ?? active?.connection ?? CONNECTIONS[0];
+  if (!RELATIONAL_ENGINES.has(target.engine)) {
+    target = CONNECTIONS.find((item) => RELATIONAL_ENGINES.has(item.engine)) ?? target;
+  }
+  const index = state.tabs.filter((tab) => tab.kind === "query").length + 1;
+
   const tab = {
-    id: `tab-query-${state.tabs.length + 1}`,
+    id: `tab-query-${Date.now()}-${index}`,
     dataKey: null,
-    node: { label: "查询 1", kind: "query" },
-    connection,
-    title: "查询 1",
+    node: { label: `查询 ${index}`, kind: "query" },
+    connection: target,
+    title: `查询 ${index}`,
     kind: "query",
     dirty: false,
+    sql: SAMPLE_SQL,
   };
   state.tabs.push(tab);
   state.activeTabId = tab.id;
@@ -824,7 +824,9 @@ function renderWorkspace() {
   }
 
   if (tab.kind === "query") {
-    host.appendChild(buildQueryPlaceholder());
+    const view = new QueryView({ tab });
+    state.view = view;
+    view.mount(host);
     updateStatusBar(tab);
     return;
   }
@@ -841,28 +843,171 @@ function renderWorkspace() {
   updateStatusBar(tab);
 }
 
-function buildQueryPlaceholder() {
-  const panel = document.createElement("div");
-  panel.className = "panel";
-  const head = document.createElement("div");
-  head.className = "panel__head";
-  const title = document.createElement("div");
-  title.className = "panel__title";
-  title.textContent = "查询 1";
-  head.appendChild(title);
-  panel.appendChild(head);
+/**
+ * 查询 Tab 的视图。
+ *
+ * 上下两段:上面是编辑器,下面是执行结果。执行是 mock 的,但错误定位是真的 ——
+ * 假执行器会真的去找 FROM 后面的表名,找不到就报「relation "xxx" does not exist」
+ * 并把出错的那段标红波浪线。
+ */
+class QueryView extends DataView {
+  constructor({ tab }) {
+    super({ node: tab.node, connection: tab.connection });
+    this.tab = tab;
 
-  const body = document.createElement("div");
-  body.className = "panel__body";
-  body.appendChild(
-    buildEmpty(
-      "查询编辑器将在 V0.3 实现",
-      "当前版本先固定工作台的信息架构:对象树导航、Tab 工作区、状态栏反馈。",
-    ),
-  );
-  panel.appendChild(body);
-  return panel;
+    // 头部
+    this.element.appendChild(buildPanelHead({ node: tab.node, connection: tab.connection, subtitle: tab.connection.subtitle }, ""));
+
+    const runBtn = button("执行", {
+      className: "btn btn--sm btn--primary",
+      icon: "play",
+      title: "执行 ⌘↵",
+      onClick: () => this.execute(),
+    });
+    this.element.querySelector(".panel__head").appendChild(runBtn);
+
+    // 编辑器
+    this.editor = new QueryEditor({
+      value: tab.sql ?? "",
+      onExecute: () => this.execute(),
+      onChange: (value) => {
+        this.tab.sql = value;
+        this.tab.dirty = true;
+        renderTabs();
+      },
+    });
+    this.editor.mount(this.element);
+
+    // 状态条
+    const bar = document.createElement("div");
+    bar.className = "query__bar";
+    this.barInfo = document.createElement("span");
+    const spacer = document.createElement("div");
+    spacer.className = "query__bar-spacer";
+    bar.append(this.barInfo, spacer);
+    bar.appendChild(
+      button("正常示例", {
+        className: "btn btn--sm btn--ghost",
+        onClick: () => this.loadSample(SAMPLE_SQL),
+      }),
+    );
+    bar.appendChild(
+      button("错误示例", {
+        className: "btn btn--sm btn--ghost",
+        onClick: () => this.loadSample(SAMPLE_SQL_ERROR),
+      }),
+    );
+    this.element.appendChild(bar);
+    this.bar = bar;
+
+    // 结果区
+    const body = document.createElement("div");
+    body.className = "panel__body";
+    this.element.appendChild(body);
+    this.resultHost = body;
+
+    this.#updateBar();
+  }
+
+  loadSample(sql) {
+    this.editor.setValue(sql);
+    this.editor.focus();
+  }
+
+  execute() {
+    const sql = this.editor.getValue();
+    const tables = buildTableRegistry(this.tab.connection);
+    const result = executeQuery(sql, { tables });
+
+    if (!result.ok) {
+      this.editor.setError(result.error);
+      this.#showError(result.error);
+      this.#updateBar(result);
+      return;
+    }
+
+    this.editor.clearError();
+    this.#showResults(result);
+    this.#updateBar(result);
+  }
+
+  #updateBar(result = null) {
+    const sql = this.editor.getValue();
+    const statements = splitStatements(sql).length;
+    this.barInfo.replaceChildren();
+
+    const strong = document.createElement("span");
+    strong.className = "query__bar-value";
+    strong.textContent = String(statements);
+    this.barInfo.appendChild(strong);
+    this.barInfo.appendChild(document.createTextNode(" 条语句"));
+    this.barInfo.appendChild(document.createTextNode(" · ⌘↵ 执行"));
+    if (result?.ok) {
+      this.barInfo.appendChild(document.createTextNode(" · "));
+      const elapsed = document.createElement("span");
+      elapsed.className = "query__bar-value";
+      elapsed.textContent = String(result.elapsedMs);
+      this.barInfo.appendChild(elapsed);
+      this.barInfo.appendChild(document.createTextNode(" ms"));
+    }
+  }
+
+  #showError(error) {
+    this.resultHost.replaceChildren();
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    const title = document.createElement("div");
+    title.className = "empty__title";
+    title.textContent = "查询未执行";
+    empty.appendChild(title);
+    const desc = document.createElement("div");
+    desc.className = "empty__desc";
+    desc.textContent = error.detail ?? error.message;
+    empty.appendChild(desc);
+    this.resultHost.appendChild(empty);
+  }
+
+  #showResults(result) {
+    this.resultHost.replaceChildren();
+    const first = result.results[0];
+    if (!first) return;
+
+    if (first.kind === "message") {
+      this.resultHost.appendChild(buildEmpty("Query OK", "语句执行完成,没有返回结果集"));
+      return;
+    }
+
+    const grid = new DataGrid({
+      columns: first.columns,
+      rows: first.rows,
+      total: first.total,
+    });
+    grid.mount(this.resultHost);
+    this.grid = grid;
+  }
+
+  destroy() {
+    this.grid?.destroy();
+    this.editor?.destroy();
+    super.destroy();
+  }
 }
+
+/**
+ * 某个连接下已知的表,按裸表名索引。
+ *
+ * mock 执行器是按 `FROM users` 里的裸表名找表的,所以索引也用裸名。
+ */
+function buildTableRegistry(connection) {
+  const registry = new Map();
+  for (const [key, data] of Object.entries(TABLE_DATA)) {
+    if (!key.startsWith(`${connection.id}/`)) continue;
+    const name = key.split("/").pop();
+    if (!registry.has(name)) registry.set(name, data);
+  }
+  return registry;
+}
+
 
 function updateStatusBar(tab) {
   const status = document.querySelector('[data-role="statusbar"]');
@@ -1460,7 +1605,146 @@ function syncSettingsControls() {
 }
 
 /* -----------------------------------------------------------------------------
- * 12. 路由
+ * 13. 命令面板
+ *
+ * 命令和对象放在一起检索:对象树可能有几百个节点,让用户先展开三层再找
+ * 一张表不现实,直接搜表名更快。
+ * -------------------------------------------------------------------------- */
+function buildCommands() {
+  const commands = [
+    {
+      id: "cmd:new-connection",
+      title: "新建连接",
+      category: "命令",
+      icon: "plus",
+      action: () => {
+        location.hash = "#/connect";
+      },
+    },
+    {
+      id: "cmd:open-query",
+      title: "打开查询",
+      subtitle: "在当前连接上新建查询标签",
+      category: "命令",
+      icon: "play",
+      shortcut: "⌘↵",
+      action: () => openQueryTab(),
+    },
+    {
+      id: "cmd:refresh",
+      title: "刷新对象树",
+      category: "命令",
+      icon: "refresh",
+      action: () => renderWorkspace(),
+    },
+    {
+      id: "cmd:commit",
+      title: "提交事务",
+      category: "命令",
+      icon: "check",
+      action: () => console.info("提交当前连接的事务"),
+    },
+    {
+      id: "cmd:rollback",
+      title: "回滚事务",
+      category: "命令",
+      icon: "refresh",
+      action: () => console.info("回滚当前连接的事务"),
+    },
+    {
+      id: "cmd:toggle-theme",
+      title: "切换主题",
+      subtitle: "跟随系统 / 浅色 / 深色",
+      category: "命令",
+      icon: "sun",
+      action: () => {
+        const order = ["system", "light", "dark"];
+        applyTheme(order[(order.indexOf(state.theme) + 1) % order.length]);
+        syncSettingsControls();
+      },
+    },
+    {
+      id: "cmd:toggle-density",
+      title: "切换密度",
+      subtitle: "舒适 / 紧凑",
+      category: "命令",
+      icon: "columns",
+      action: () => {
+        applyDensity(state.density === "compact" ? "comfortable" : "compact");
+        syncSettingsControls();
+      },
+    },
+    {
+      id: "cmd:settings",
+      title: "打开设置",
+      category: "命令",
+      icon: "settings",
+      action: () => {
+        location.hash = "#/settings";
+      },
+    },
+    {
+      id: "cmd:spec",
+      title: "查看设计规范",
+      category: "命令",
+      icon: "info",
+      action: () => {
+        location.hash = "#/spec";
+      },
+    },
+  ];
+
+  // 对象:能打开数据视图的节点都能直接跳过去
+  for (const connection of CONNECTIONS) {
+    const engine = ENGINES[connection.engine];
+    collectNodes(connection.tree, (node) => {
+      if (!node.dataKey) return;
+      commands.push({
+        id: `obj:${node.dataKey}`,
+        title: node.label,
+        subtitle: `${engine.label} · ${nodePathLabel(node)}`,
+        category: "对象",
+        icon: iconForKind(node.kind),
+        action: () => openObjectTab(node),
+      });
+    });
+  }
+
+  return commands;
+}
+
+/**
+ * 跳到某个对象并开成 Tab。
+ *
+ * 从别的路由跳过来时,得等 hashchange 把工作台渲染出来才能挂 Tab,
+ * 所以这里等一次 hashchange 再执行。
+ */
+function openObjectTab(node) {
+  if (parseHash() === "design") {
+    openTabForNode(node);
+    return;
+  }
+  const onHashChange = () => {
+    window.removeEventListener("hashchange", onHashChange);
+    openTabForNode(node);
+  };
+  window.addEventListener("hashchange", onHashChange);
+  location.hash = "#/design";
+}
+
+function collectNodes(node, visit) {
+  visit(node);
+  for (const child of node.children ?? []) collectNodes(child, visit);
+}
+
+/** 对象的层级路径,给命令面板当副标题。 */
+function nodePathLabel(node) {
+  const parts = String(node.id).split("/");
+  return parts.slice(1, -1).join(" / ") || "根";
+}
+
+/* -----------------------------------------------------------------------------
+ * 14. 路由
  * -------------------------------------------------------------------------- */
 function parseHash() {
   const raw = location.hash.replace(/^#\/?/, "");
@@ -1499,11 +1783,27 @@ function renderRoute(root) {
 }
 
 /* -----------------------------------------------------------------------------
- * 13. 启动
+ * 15. 启动
  * -------------------------------------------------------------------------- */
 export function boot(root) {
   restorePreferences();
   buildNodeIndex();
+
+  // 命令面板挂在 body 上,不随路由切换被清掉
+  const palette = new CommandPalette({ commands: buildCommands() });
+  palette.mount(document.body);
+  state.palette = palette;
+
+  window.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (palette.isOpen()) {
+        palette.close();
+      } else {
+        palette.open();
+      }
+    }
+  });
 
   const render = () => renderRoute(root);
   window.addEventListener("hashchange", render);

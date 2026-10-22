@@ -186,6 +186,35 @@ await page.waitForSelector(".doc", { timeout: 5000 });
 const docs = await page.locator(".doc").count();
 check("MongoDB 渲染出文档卡片", docs > 0, `可见 ${docs} 个`);
 
+const docNodes = await page.locator(".doc-node").count();
+check("文档渲染成可折叠树", docNodes > 0, `可见 ${docNodes} 个节点`);
+
+const docBranches = await page.locator(".doc-node__children").count();
+const docOpen = await page.locator(".doc-node__children.is-open").count();
+check(
+  "默认只展开第一层",
+  docOpen > 0 && docOpen < docBranches,
+  `展开 ${docOpen} / 共 ${docBranches} 个分支`,
+);
+
+const docNulls = await page.locator(".doc__value--null").count();
+check("文档里的 null 有独立样式", docNulls > 0, `可见 ${docNulls} 个`);
+
+// 折叠交互:点箭头后子节点应当收起
+const toggle = page.locator(".doc-node__toggle:not(.is-leaf)").first();
+const beforeToggle = await page.locator(".doc-node__children.is-open").count();
+await toggle.click();
+await page.waitForTimeout(150);
+const afterToggle = await page.locator(".doc-node__children.is-open").count();
+check("点击箭头可以折叠分支", afterToggle !== beforeToggle, `${beforeToggle} → ${afterToggle}`);
+
+await page.locator(".doc__action", { hasText: "展开全部" }).first().click();
+await page.waitForTimeout(150);
+const afterExpandAll = await page.locator(".doc-node__children.is-open").count();
+check("展开全部生效", afterExpandAll >= afterToggle, `${afterToggle} → ${afterExpandAll}`);
+
+await shot(page, "10-document-tree");
+
 await page.locator(".tree__node[data-id='redis-local']").click();
 await page.locator(".tree__node[data-id='redis-local/db0']").click();
 await page.waitForSelector(".grid__row--body", { timeout: 5000 });
@@ -194,8 +223,68 @@ check("Redis 渲染出键列表", redisRows > 0, `可见 ${redisRows} 行`);
 
 await shot(page, "03-nosql");
 
+// ---- 查询编辑器 ----
+console.log("\n[6] 查询编辑器");
+await page.locator(".tree__search input").fill("");
+await page.locator("button", { hasText: "打开查询" }).first().click();
+await page.waitForSelector(".query__input", { timeout: 5000 });
+check("查询编辑器已打开", (await page.locator(".query__input").count()) === 1);
+
+const keywords = await page.locator(".query__code .tok-keyword").count();
+check("SQL 关键字有语法着色", keywords > 0, `${keywords} 个关键字 token`);
+
+const lineNumbers = await page.locator(".query__line-number").count();
+check("编辑器有行号", lineNumbers > 0, `${lineNumbers} 行`);
+
+// 执行正常示例
+await page.locator(".btn--primary", { hasText: "执行" }).click();
+await page.waitForTimeout(300);
+check("执行后没有错误条", (await page.locator(".query__error").count()) === 0);
+const queryRows = await page.locator(".grid__row--body").count();
+check("执行后渲染出结果集", queryRows > 0, `${queryRows} 行`);
+await shot(page, "07-query");
+
+// 执行错误示例:验证错误定位
+await page.locator(".btn--ghost", { hasText: "错误示例" }).click();
+await page.waitForTimeout(150);
+await page.locator(".btn--primary", { hasText: "执行" }).click();
+await page.waitForTimeout(300);
+check("错误示例给出错误条", (await page.locator(".query__error").count()) === 1);
+const errorText = (await page.locator(".query__error").textContent()) ?? "";
+check("错误信息指出不存在的表", errorText.includes("does not exist"), errorText.trim().slice(0, 60));
+const errorMarks = await page.locator(".tok--error").count();
+check("出错的片段被标红", errorMarks > 0, `${errorMarks} 处`);
+await shot(page, "08-query-error");
+
+// ---- 命令面板 ----
+console.log("\n[7] 命令面板");
+await page.keyboard.press("Meta+k");
+await page.waitForTimeout(250);
+check("⌘K 打开命令面板", (await page.locator(".palette").count()) === 1);
+
+await page.locator(".palette__input").fill("order");
+await page.waitForTimeout(250);
+const hits = await page.locator(".palette__item").count();
+check("面板能模糊匹配对象", hits > 0, `匹配 ${hits} 项`);
+
+const marks = await page.locator(".palette__item mark").count();
+check("命中字符高亮", marks > 0, `${marks} 处`);
+
+await page.keyboard.press("ArrowDown");
+await page.waitForTimeout(120);
+const activeIndex = await page.evaluate(
+  () => [...document.querySelectorAll(".palette__item")].findIndex((el) => el.classList.contains("is-active")),
+);
+check("方向键移动选中项", activeIndex >= 0, `选中第 ${activeIndex + 1} 项`);
+
+await shot(page, "09-palette");
+
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+check("Esc 关闭面板", (await page.locator(".palette").count()) === 1 && (await page.locator(".palette__overlay:not([hidden])").count()) === 0);
+
 // ---- 主题与密度 ----
-console.log("\n[6] 主题与密度");
+console.log("\n[8] 主题与密度");
 await page.locator(".tree__search input").fill("");
 await page.evaluate(() => {
   localStorage.setItem("seladb.ui.theme", "dark");
@@ -217,7 +306,7 @@ await page.evaluate(() => {
 });
 
 // ---- 其他路由 ----
-console.log("\n[7] 路由");
+console.log("\n[9] 路由");
 for (const [route, selector] of [
   ["#/entry", ".entry__card"],
   ["#/spec", ".swatches"],
@@ -241,7 +330,7 @@ await page.waitForSelector(".entry__card", { timeout: 5000 });
 await shot(page, "06-entry");
 
 // ---- 控制台 ----
-console.log("\n[8] 控制台");
+console.log("\n[10] 控制台");
 check("无控制台错误", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
 await browser.close();

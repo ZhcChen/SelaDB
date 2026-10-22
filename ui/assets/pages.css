@@ -492,18 +492,19 @@
 }
 
 /* -----------------------------------------------------------------------------
- * 6. 文档视图(MongoDB)
+ * 6. 文档树(MongoDB)
+ *
+ * MongoDB 的文档不是表格:字段可以嵌套对象、可以成数组。平铺成一行 JSON
+ * 字符串会丢掉层级,用户在几十个字段里根本找不到要看的那一项。
  * -------------------------------------------------------------------------- */
-.docs {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+.doc-list {
   padding: var(--sp-4);
-  background: var(--bg-canvas);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
 }
 
 .doc {
-  margin-bottom: var(--sp-4);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--r-lg);
@@ -517,43 +518,116 @@
   padding: var(--sp-3) var(--sp-4);
   background: var(--bg-inset);
   border-bottom: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
 }
 
 .doc__id {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   color: var(--type-uuid);
 }
 
-.doc__fields {
-  display: grid;
-  grid-template-columns: 140px 1fr;
+.doc__actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--sp-2);
 }
 
-.doc__field {
-  display: contents;
-}
-
-.doc__key {
-  padding: var(--sp-2) var(--sp-4);
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+.doc__action {
+  height: 20px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-xs);
   color: var(--fg-muted);
-  border-bottom: 1px solid var(--border-subtle);
-  border-right: 1px solid var(--border-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
 }
 
-.doc__value {
-  padding: var(--sp-2) var(--sp-4);
+.doc__action:hover {
+  background: var(--bg-hover);
+  color: var(--fg-default);
+  border-color: var(--border-default);
+}
+
+.doc-tree__body {
+  padding: var(--sp-2) 0;
+}
+
+/* 三列网格:箭头 / 字段名 / 值。
+   子节点容器独占第二行 —— 用 flex 的话子容器会变成值的同级兄弟,
+   数组节点因为要一直显示摘要,子节点会被推到最右边。 */
+.doc-node {
+  display: grid;
+  grid-template-columns: 14px 160px minmax(0, 1fr);
+  column-gap: var(--sp-2);
+  align-items: start;
+  padding: 1px var(--sp-4) 1px 0;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  color: var(--fg-default);
-  border-bottom: 1px solid var(--border-subtle);
+  line-height: var(--lh-base);
+}
+
+.doc-node__toggle {
+  grid-column: 1;
+  grid-row: 1;
+  width: 14px;
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.doc-node__toggle.is-open {
+  transform: rotate(90deg);
+}
+
+/* 叶子节点保留位置但不显示箭头,字段名才能整列对齐 */
+.doc-node__toggle.is-leaf {
+  visibility: hidden;
+}
+
+.doc-node__key {
+  grid-column: 2;
+  grid-row: 1;
+  padding-right: var(--sp-4);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-node__value {
+  grid-column: 3;
+  grid-row: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 对象节点展开后摘要会被清空,收掉空档 */
+.doc-node__value:empty {
+  display: none;
+}
+
+.doc-node__children {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.doc__value--string {
+  color: var(--fg-default);
+}
+
+.doc__value--number {
+  color: var(--type-int);
+}
+
+.doc__value--bool {
+  color: var(--type-bool);
 }
 
 .doc__value--null {
@@ -561,20 +635,14 @@
   font-style: italic;
 }
 
-.doc__value--nested {
+.doc__value--object,
+.doc__value--array {
   color: var(--type-json);
 }
 
 /* -----------------------------------------------------------------------------
- * 7. 键值列表说明(Redis)
+ * 7. 键值列表(Redis)
+ *
+ * Redis 的键列表形态上仍是行式表格,直接复用 DataGrid;
+ * 这里只保留一个说明块的位置,给将来的「按类型分组」视图用。
  * -------------------------------------------------------------------------- */
-.kv-note {
-  padding: var(--sp-4);
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-  line-height: var(--lh-loose);
-  background: var(--info-soft);
-  border: 1px solid var(--info-border);
-  border-radius: var(--r-md);
-  margin-bottom: var(--sp-4);
-}
