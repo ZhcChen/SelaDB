@@ -110,6 +110,8 @@ button {
   grid-template-rows: var(--h-topbar) 1fr var(--h-statusbar);
   height: 100vh;
   overflow: hidden;
+  /* 侧栏宽度,顶栏与状态栏的渐变分界靠它 */
+  --tree-w: var(--w-tree);
 }
 
 .app__body {
@@ -124,14 +126,24 @@ button {
  * 原来标题栏与工具栏是上下两行:第二行只放四五个操作,横向空得发慌,却实打实
  * 占了 40px 纵向空间。合并成一行后,把纵向空间还给数据网格。
  * -------------------------------------------------------------------------- */
+/*
+ * 顶栏左段跟侧栏同色、右段跟主内容同色 —— 侧栏于是是一整条连续的列,
+ * 而不是「从顶栏下面才开始」的一截。--tree-w 由分隔条拖动时更新。
+ *
+ * 底边是浅灰分割线,这是需要的:顶栏跟下面的内容区必须断开。
+ */
 .topbar {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   height: var(--h-topbar);
   padding: 0 var(--sp-4);
-  background: var(--bg-canvas);
-  border-bottom: none;
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 0 var(--tree-w),
+    var(--bg-canvas) var(--tree-w)
+  );
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .topbar__brand {
@@ -341,10 +353,9 @@ button {
   min-width: var(--w-tree-min);
   max-width: var(--w-tree-max);
   flex: none;
-  /* 跟主内容同色,分界靠右边缘的淡阴影 */
-  background: var(--bg-canvas);
+  /* 侧栏跟主内容不同底色,靠底色分界,不用线也不用阴影 */
+  background: var(--bg-surface);
   border-right: none;
-  box-shadow: var(--edge-shadow);
   overflow: hidden;
 }
 
@@ -1091,8 +1102,12 @@ button {
   align-items: center;
   gap: var(--sp-5);
   padding: 0 var(--sp-4);
-  background: var(--bg-canvas);
-  border-top: none;
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 0 var(--tree-w),
+    var(--bg-canvas) var(--tree-w)
+  );
+  border-top: 1px solid var(--border-subtle);
   font-size: var(--fs-xs);
   color: var(--fg-muted);
 }

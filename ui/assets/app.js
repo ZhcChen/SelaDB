@@ -1538,7 +1538,10 @@ function buildSplitter() {
       const next = startWidth + (moveEvent.clientX - startX);
       const min = parseFloat(getComputedStyle(treeEl).minWidth) || 180;
       const max = parseFloat(getComputedStyle(treeEl).maxWidth) || 520;
-      treeEl.style.width = `${Math.min(max, Math.max(min, next))}px`;
+      const width = Math.min(max, Math.max(min, next));
+      treeEl.style.width = `${width}px`;
+      // 顶栏与状态栏的渐变分界跟着侧栏宽度走
+      state.shell?.style.setProperty("--tree-w", `${width}px`);
     };
 
     const onUp = () => {

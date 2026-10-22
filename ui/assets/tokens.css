@@ -24,7 +24,7 @@
    * 层次靠三档背景:内容区最亮,侧栏略暗,浮层卡片最亮(有边框托着)。
    */
   --bg-canvas: #ffffff;
-  --bg-surface: #f6f6f7;
+  --bg-surface: #f3f3f4;
   --bg-raised: #ffffff;
   --bg-sunken: #ededee;
   --bg-inset: #f0f0f1;
@@ -110,7 +110,7 @@ body[data-theme="dark"] {
    * 全部是中性灰,没有任何蓝调。
    */
   --bg-canvas: #1c1c1c;
-  --bg-surface: #171717;
+  --bg-surface: #151515;
   --bg-raised: #262626;
   --bg-sunken: #121212;
   --bg-inset: #202020;
