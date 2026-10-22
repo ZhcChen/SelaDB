@@ -393,6 +393,8 @@ button {
   align-items: center;
   gap: var(--sp-2);
   height: var(--row-h-tree);
+  /* 左边留够,展开箭头不要贴着面板边 */
+  padding-left: var(--sp-4);
   /* 右侧留够,计数徽标不要贴着面板边 */
   padding-right: var(--sp-4);
   color: var(--fg-default);
