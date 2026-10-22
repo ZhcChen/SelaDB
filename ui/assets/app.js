@@ -731,7 +731,7 @@ function buildTopbar() {
   txButtons.className = "topbar__group";
   txButtons.dataset.role = "tx-actions";
   const commitBtn = button("提交", {
-    className: "btn btn--tool",
+    className: "btn btn--tool btn--commit",
     icon: "check",
     title: "提交当前连接的事务",
     onClick: () => console.info("提交当前连接的事务"),
@@ -767,10 +767,17 @@ function buildTopbar() {
   bar.appendChild(tx);
 
   // 当前连接:提交/回滚的作用对象
-  const connBtn = button("—", {
-    className: "btn btn--tool",
+  const connBtn = button("", {
+    className: "btn btn--tool btn--conn",
     title: "当前连接",
   });
+  // 引擎图标 + 文字分开放:更新时只换文字,不会把图标一起抹掉
+  const connIcon = document.createElement("span");
+  connIcon.className = "topbar__conn-icon";
+  connBtn.prepend(connIcon);
+  const connLabel = document.createElement("span");
+  connLabel.dataset.role = "current-connection-label";
+  connBtn.appendChild(connLabel);
   connBtn.dataset.role = "current-connection";
   connBtn.addEventListener("click", (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -1462,7 +1469,15 @@ function updateStatusBar(tab) {
   // 工具栏上的「当前连接」要跟状态栏一致:提交/回滚只作用于这个连接
   const connBtn = document.querySelector('[data-role="current-connection"]');
   if (connBtn) {
-    connBtn.textContent = connection ? connection.label : "未选择连接";
+    const label = connBtn.querySelector('[data-role="current-connection-label"]');
+    if (label) label.textContent = connection ? connection.label : "未选择连接";
+    // 当前是哪个引擎,用引擎自己的图标标出来 —— 跟对象树里的连接节点呼应
+    const iconHost = connBtn.querySelector(".topbar__conn-icon");
+    if (iconHost) {
+      iconHost.textContent = "";
+      const icon = connection ? createEngineIcon(connection.engine, 14) : null;
+      if (icon) iconHost.appendChild(icon);
+    }
     connBtn.disabled = !connection;
     connBtn.style.display = connection ? "" : "none";
   }

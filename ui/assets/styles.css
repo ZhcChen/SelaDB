@@ -185,7 +185,10 @@ button {
 }
 
 /* 顶栏里的操作按钮走 Ghost 样式:桌面工具的操作条不该是一排带描边的网页按钮 */
-.btn--tool {
+/* 选择器提一级特异性(.btn.btn--tool):
+   下面第 270 行的 .btn 基础样式与本条同特异性,位置在后会把它整个盖掉 ——
+   顶栏按钮于是全都渲染成带描边的实心按钮,「Ghost 样式」形同虚设。 */
+.btn.btn--tool {
   height: 26px;
   padding: 0 var(--sp-3);
   font-size: var(--fs-sm);
@@ -195,17 +198,17 @@ button {
   border-radius: var(--r-sm);
 }
 
-.btn--tool:hover {
+.btn.btn--tool:hover {
   background: var(--bg-hover);
   color: var(--fg-default);
   border-color: transparent;
 }
 
-.btn--tool:active {
+.btn.btn--tool:active {
   background: var(--bg-active);
 }
 
-.btn--tool[disabled] {
+.btn.btn--tool[disabled] {
   color: var(--fg-disabled);
 }
 
@@ -605,6 +608,27 @@ button {
 .splitter.is-dragging .splitter__grip {
   color: var(--accent);
   opacity: 1;
+}
+
+/* 当前连接:带引擎图标,跟对象树里的连接节点呼应 */
+.btn--conn {
+  color: var(--fg-default);
+  padding-left: var(--sp-2);
+}
+
+.topbar__conn-icon {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* 提交是不可逆操作,给一层视觉权重;回滚可逆,保持弱 */
+.btn--commit {
+  color: var(--fg-default);
+}
+
+.btn--commit .icon {
+  color: var(--accent);
 }
 
 /* -----------------------------------------------------------------------------
