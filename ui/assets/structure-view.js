@@ -281,6 +281,29 @@ class StructureView {
     return this;
   }
 
+  /**
+   * 只挂载某一个分面,不带子标签栏。
+   *
+   * 表视图把「数据 / 列 / 索引 / 约束 / 外键 / DDL」合并成一行标签
+   * (DBeaver 的做法),结构视图就不再自带标签栏,避免两层标签互相打架。
+   */
+  mountPanel(container, tabName) {
+    this.#teardown();
+
+    this.container = container;
+    this.tab = tabName;
+
+    const root = document.createElement("div");
+    root.className = "structure structure--panel";
+    this.root = root;
+
+    const panel = this.#buildPanel(tabName);
+    root.appendChild(panel);
+    container.appendChild(root);
+    this.mounted = true;
+    return this;
+  }
+
   destroy() {
     this.#teardown();
     this.root?.remove();
@@ -390,25 +413,32 @@ class StructureView {
     wrap.className = "struct-panels";
 
     for (const tab of TABS) {
-      const panel = document.createElement("div");
-      panel.className = "struct-panel";
-      panel.dataset.tab = tab.name;
-      panel.setAttribute("role", "tabpanel");
-
-      if (tab.name === "ddl") {
-        const ddl = this.#buildDdl();
-        if (ddl) panel.appendChild(ddl);
-        else panel.appendChild(buildStructEmpty(tab.empty));
-      } else {
-        const table = this.#buildDataTable(tab);
-        panel.appendChild(table ?? buildStructEmpty(tab.empty));
-      }
-
+      const panel = this.#buildPanel(tab.name);
       wrap.appendChild(panel);
       this.panels.set(tab.name, panel);
     }
 
     return wrap;
+  }
+
+  /** 造单个分面。 */
+  #buildPanel(tabName) {
+    const panel = document.createElement("div");
+    panel.className = "struct-panel";
+    panel.dataset.tab = tabName;
+    panel.setAttribute("role", "tabpanel");
+
+    // DDL 不在 TABS 里 —— 它由表编辑器的标签行直接调,不再经过子标签栏
+    if (tabName === "ddl") {
+      const ddl = this.#buildDdl();
+      panel.appendChild(ddl ?? buildStructEmpty("没有 DDL"));
+      return panel;
+    }
+
+    const tab = TABS.find((item) => item.name === tabName) ?? TABS[0];
+    const table = this.#buildDataTable(tab);
+    panel.appendChild(table ?? buildStructEmpty(tab.empty));
+    return panel;
   }
 
   #countOf(name) {
@@ -501,24 +531,26 @@ class StructureView {
 
       tr.appendChild(cell(String(positionOf(column, index))));
 
-      // 键标记放在列名左边 —— 放在最右侧的独立一列,视线要横跨整行才找得到
-      const nameCell = document.createElement("td");
-      nameCell.className = "struct-namecell";
+      // 键标记单独一列,紧挨在列名左边。
+      // 混进列名单元格里会把列名文字整体右移,列名之间就对不齐了。
+      const keyCell = document.createElement("td");
+      keyCell.className = "struct-keycell";
       if (column?.pk) {
         const badge = document.createElement("span");
         badge.className = "struct-key struct-key--pk";
         badge.textContent = "PK";
-        nameCell.appendChild(badge);
+        keyCell.appendChild(badge);
       } else if (foreignKeyColumns.has(column?.name)) {
         const badge = document.createElement("span");
         badge.className = "struct-key struct-key--fk";
         badge.textContent = "FK";
-        nameCell.appendChild(badge);
+        keyCell.appendChild(badge);
       }
-      const nameText = document.createElement("span");
-      nameText.className = "mono";
-      nameText.textContent = column?.name ?? "";
-      nameCell.appendChild(nameText);
+      tr.appendChild(keyCell);
+
+      const nameCell = document.createElement("td");
+      nameCell.className = "mono";
+      nameCell.textContent = column?.name ?? "";
       // 列注释放进 title,表格不因此多一列
       if (column?.comment) nameCell.title = column.comment;
       tr.appendChild(nameCell);
@@ -547,7 +579,7 @@ class StructureView {
       body.appendChild(tr);
     });
 
-    return buildStructTable(["位置", "列名", "类型", "可空", "默认值"], body);
+    return buildStructTable(["位置", "键", "列名", "类型", "可空", "默认值"], body);
   }
 
   /** 索引:名称 / 列 / 唯一 / 方法 / 主键 */

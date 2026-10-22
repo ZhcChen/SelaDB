@@ -858,6 +858,8 @@ button {
   align-items: flex-start;
   justify-content: center;
   gap: 1px;
+  /* 行高要自己定,继承正文的 1.5 会把第二行顶到数据行上 */
+  line-height: 1;
   padding: var(--sp-2) var(--cell-x);
   cursor: pointer;
   color: var(--grid-header-fg);
@@ -874,6 +876,7 @@ button {
   gap: var(--sp-2);
   width: 100%;
   min-width: 0;
+  line-height: 15px;
 }
 
 .grid__cell--head:hover {
@@ -892,6 +895,7 @@ button {
 
 .grid__col-type {
   font-size: 10px;
+  line-height: 12px;
   font-weight: var(--fw-normal);
   letter-spacing: 0.02em;
   /* 类型注解是结构元数据,要读得清 —— 用 muted 而不是 subtle */
@@ -2578,10 +2582,9 @@ body[data-theme="dark"] .grid__badge--zset {
 /* -----------------------------------------------------------------------------
  * 22. 结构视图的列名、类型与默认值
  * -------------------------------------------------------------------------- */
-.struct-namecell {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+/* 键标记的窄列,紧挨列名 */
+.struct-keycell {
+  width: 44px;
   white-space: nowrap;
 }
 

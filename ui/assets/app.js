@@ -142,6 +142,22 @@ class DataView {
 }
 
 /** 关系型表数据 —— 内部用 DataGrid 实现。 */
+/**
+ * 表编辑器的标签页。
+ *
+ * 「数据 / 列 / 索引 / 约束 / 外键 / DDL」合成一行 —— 之前是面板头一个
+ * 「数据/结构/DDL」分段控件,结构视图里又有一排「列/索引/约束/外键」,
+ * 两层标签互相打架,谁在上一层说不清。合成一行是 DBeaver 的做法。
+ */
+const TABLE_TABS = [
+  { key: "data", label: "数据", icon: "table" },
+  { key: "columns", label: "列", icon: "columns" },
+  { key: "indexes", label: "索引", icon: "index" },
+  { key: "constraints", label: "约束", icon: "check" },
+  { key: "foreignKeys", label: "外键", icon: "keygroup" },
+  { key: "ddl", label: "DDL", icon: "table" },
+];
+
 class TableDataView extends DataView {
   constructor(ctx) {
     super(ctx);
@@ -154,7 +170,8 @@ class TableDataView extends DataView {
     this.data = data;
     this.structure = TABLE_STRUCTURE[ctx.dataKey];
     this.ddl = generateDdl(ctx.dataKey);
-    this.mode = ctx.mode ?? "data";
+    // 树右键菜单的「查看结构」落在列分面上
+    this.mode = ctx.mode === "structure" ? "columns" : (ctx.mode ?? "data");
 
     // 过滤条挂到面板头,不给它独占一行
     this.filterHost = document.createElement("div");
@@ -163,26 +180,25 @@ class TableDataView extends DataView {
     this.head = buildPanelHead(ctx, "", [this.filterHost]);
     this.element.appendChild(this.head);
 
-    // 数据 / 结构 / DDL 三种视图共用一个 Tab —— 拆成三个 Tab 会让标签栏爆掉,
-    // 而这本来就是同一张表的三个切面。
+    // 标签栏
     if (this.structure) {
-      const modes = document.createElement("div");
-      modes.className = "segmented";
-      for (const [key, label] of [
-        ["data", "数据"],
-        ["structure", "结构"],
-        ["ddl", "DDL"],
-      ]) {
-        const item = document.createElement("button");
-        item.type = "button";
-        item.className = "segmented__item";
-        item.textContent = label;
-        item.dataset.mode = key;
-        item.addEventListener("click", () => this.setMode(key));
-        modes.appendChild(item);
+      const tabs = document.createElement("div");
+      tabs.className = "subtabs";
+      for (const tab of TABLE_TABS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "subtab";
+        button.dataset.mode = tab.key;
+        button.appendChild(createIcon(tab.icon, 13));
+        const label = document.createElement("span");
+        label.className = "subtab__label";
+        label.textContent = tab.label;
+        button.appendChild(label);
+        button.addEventListener("click", () => this.setMode(tab.key));
+        tabs.appendChild(button);
       }
-      this.head.appendChild(modes);
-      this.modes = modes;
+      this.element.appendChild(tabs);
+      this.tabs = tabs;
     }
 
     const body = document.createElement("div");
@@ -193,10 +209,10 @@ class TableDataView extends DataView {
     this.setMode(this.mode);
   }
 
-  /** 切换数据/结构/DDL。 */
+  /** 切换数据 / 列 / 索引 / 约束 / 外键 / DDL。 */
   setMode(mode) {
     this.mode = mode;
-    for (const item of this.modes?.querySelectorAll(".segmented__item") ?? []) {
+    for (const item of this.tabs?.querySelectorAll(".subtab") ?? []) {
       item.classList.toggle("is-active", item.dataset.mode === mode);
     }
     // 过滤条只对数据网格有意义。结构视图与 DDL 是只读的,挂着个
@@ -209,45 +225,31 @@ class TableDataView extends DataView {
     this.structureView = null;
     this.body.replaceChildren();
 
-    if (mode === "structure" && this.structure) {
-      this.structureView = new StructureView({
-        structure: this.structure,
-        ddl: this.ddl,
-        engine: this.ctx.connection.engine,
+    if (mode === "data") {
+      // 表的真实行数远大于设计源手写的那十几行,扩一批出来让虚拟滚动有东西可滚
+      const rows = expandRows(this.data.rows, this.data.columns, Math.min(this.data.total, 600));
+      this.grid = new DataGrid({
+        columns: this.data.columns,
+        rows,
+        total: this.data.total,
+        filterMount: this.filterHost,
+        onCellChange: (rowIndex, key, oldValue, newValue) => {
+          // 设计源里只做提示,真实提交由 Rust 侧的 service 层负责
+          console.info("单元格变更", { rowIndex, key, oldValue, newValue });
+        },
       });
-      this.structureView.mount(this.body);
-      this.setMeta(
-        `${this.structure.columns.length} 列 · ${this.structure.indexes.length} 索引 · ` +
-          `${this.structure.constraints.length} 约束 · ${this.structure.foreignKeys.length} 外键`,
-      );
-      return;
-    }
-
-    if (mode === "ddl" && this.ddl) {
-      this.structureView = new StructureView({
-        structure: this.structure,
-        ddl: this.ddl,
-        engine: this.ctx.connection.engine,
-      });
-      this.structureView.mountDdl(this.body);
+      this.grid.mount(this.body);
+      // 行数只在底栏显示一次,右上角重复一遍是界面噪音
       this.setMeta("");
       return;
     }
 
-    // 表的真实行数远大于设计源手写的那十几行,扩一批出来让虚拟滚动有东西可滚
-    const rows = expandRows(this.data.rows, this.data.columns, Math.min(this.data.total, 600));
-    this.grid = new DataGrid({
-      columns: this.data.columns,
-      rows,
-      total: this.data.total,
-      filterMount: this.filterHost,
-      onCellChange: (rowIndex, key, oldValue, newValue) => {
-        // 设计源里只做提示,真实提交由 Rust 侧的 service 层负责
-        console.info("单元格变更", { rowIndex, key, oldValue, newValue });
-      },
+    this.structureView = new StructureView({
+      structure: this.structure,
+      ddl: this.ddl,
+      engine: this.ctx.connection.engine,
     });
-    this.grid.mount(this.body);
-    // 行数只在底栏显示一次,右上角重复一遍是界面噪音
+    this.structureView.mountPanel(this.body, mode);
     this.setMeta("");
   }
 

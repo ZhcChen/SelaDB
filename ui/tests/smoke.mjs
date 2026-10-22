@@ -329,15 +329,19 @@ await page.locator(".tree__node[data-id='pg-local']").click();
 await page.locator(".tree__node[data-id='pg-local/postgres']").click();
 await page.locator(".tree__node[data-id='pg-local/postgres/public']").click();
 await page.locator(".tree__node[data-id='pg-local/postgres/public/users']").click();
-await page.waitForSelector(".panel__head .segmented__item", { timeout: 5000 });
+await page.waitForSelector(".subtab", { timeout: 5000 });
 
-const modes = await page.locator(".panel__head .segmented__item").allTextContents();
-check("表 Tab 有数据/结构/DDL 三态", modes.length === 3, modes.join(" / "));
+const modes = await page.locator(".subtab").allTextContents();
+check(
+  "表编辑器是单一标签行(数据/列/索引/约束/外键/DDL)",
+  modes.length === 6,
+  modes.join(" / "),
+);
 
-await page.locator(".panel__head .segmented__item", { hasText: "结构" }).click();
+await page.locator('.subtab[data-mode="columns"]').click();
 await page.waitForTimeout(250);
-const subtabs = await page.locator(".subtab").allTextContents();
-check("结构视图有四个分面", subtabs.length === 4, subtabs.join(" / "));
+const columnRows = await page.locator(".struct-panel:not([hidden]) .struct-table tbody tr").count();
+check("列分面渲染出列定义", columnRows > 0, `${columnRows} 行`);
 
 const structRows = await page.locator(".struct-panel:not([hidden]) .struct-table tbody tr").count();
 check("列出列定义", structRows > 0, `${structRows} 行`);
@@ -348,7 +352,7 @@ check("主键有标识", pkBadges > 0, `${pkBadges} 处`);
 await shot(page, "11-structure");
 
 // DDL
-await page.locator(".panel__head .segmented__item", { hasText: "DDL" }).click();
+await page.locator('.subtab[data-mode="ddl"]').click();
 await page.waitForTimeout(250);
 const ddlText = (await page.locator(".struct-ddl__code").textContent()) ?? "";
 check("DDL 预览有内容", ddlText.includes("CREATE TABLE"), ddlText.split("\n")[0]);
@@ -359,7 +363,7 @@ await shot(page, "12-ddl");
 
 // ---- 右键菜单与确认框 ----
 console.log("\n[10] 右键菜单与确认框");
-await page.locator(".panel__head .segmented__item", { hasText: "数据" }).click();
+await page.locator('.subtab[data-mode="data"]').click();
 await page.locator(".tree__node[data-id='pg-local/postgres/public/orders']").click({ button: "right" });
 await page.waitForSelector(".menu", { timeout: 3000 });
 

@@ -590,7 +590,7 @@
    数组节点因为要一直显示摘要,子节点会被推到最右边。 */
 .doc-node {
   display: grid;
-  grid-template-columns: 14px 128px minmax(0, 1fr);
+  grid-template-columns: 14px 104px minmax(0, 1fr);
   column-gap: var(--sp-2);
   align-items: baseline;
   padding: 0 var(--sp-4) 0 0;
