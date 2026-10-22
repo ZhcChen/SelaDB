@@ -1,6 +1,6 @@
 # SelaDB UI 模块设计计划
 
-> 状态：2026-10-21 待评审
+> 状态：2026-10-22 决策已定,进入实现
 > 形态：纯 HTML + CSS + JS 设计源(与 `redcode-im/im-ui-html` 同一模式)
 
 ---
@@ -60,31 +60,41 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 
 ---
 
-## 3. 各引擎的对象树不统一 —— 这是第一个要解决的表达问题
+## 3. 各引擎的对象树不统一 —— 保留原生层级
 
 | 引擎 | 层级数 | 有无 schema | 特有对象 |
 |---|---|---|---|
 | PostgreSQL | 3 | 有 | 扩展、分区、序列、类型 |
 | MySQL | 2 | 无(库=schema) | 存储过程、函数、事件、触发器 |
-| SQLite | 1 | 无 | 索引、视图、触发器 |
+| SQLite | 1–2 | 无(`main` 为隐式 schema) | 索引、视图、触发器 |
 | SQL Server | 3 | 有 | 存储过程、聚合函数、同义词 |
 | MongoDB | 2 | 无 | 集合、视图、索引 |
-| Redis | 1(按类型分组) | 无 | 按类型分组 + TTL |
+| Redis | 2 | 无(db0–db15 编号库) | 按类型分组 + TTL |
 
-**设计取舍:统一成「分组 → 集合 → 对象」三层,缺失的层不显示。**
+**设计取舍:保留引擎原生层级,不做跨引擎压平。**
 
 ```text
+▾ PostgreSQL — 本地
+  ▾ postgres                     ← database
+    ▾ public                     ← schema
+      ▸ users         1,284
+      ▸ orders        5,321
 ▾ MySQL — 本地
-  ▾ shop                    ← 数据库层
-    ▸ users        1,284
-    ▸ orders       5,321
+  ▾ shop                         ← database
+    ▸ users         1,284
 ▾ Redis — 本地
-  ▸ All Keys       8,412
-  ▸ String         6,201
-  ▸ Hash             890
+  ▾ db0                          ← 编号库
+    ▸ String          6,201
+    ▸ Hash              890
 ```
 
-即:把「database / schema / 逻辑分组」统一抽象成**第一层分组**,下面挂对象。这样对象树的交互和 UI 代码是统一的,差异只体现在「某引擎显示哪些分组项」。
+理由:
+
+1. **PG 的 database 是可 CREATE/DROP 的独立实体**,压平等于让 PG 支持不完整。DBeaver / pgAdmin / Navicat 的 PG 都是 database → schema → table 三层全显。
+2. **「各引擎深度不一」对树组件不是问题** —— TreeView 本来就是任意深度的递归结构。
+3. **差异由配置驱动,不进组件代码**:每个引擎提供一份树规格(有哪些分组项、有哪些对象类型、是否懒加载),TreeView 组件保持通用,不做 `if engine == PostgreSQL` 这类分支。
+
+实现约定:引擎树规格是一份纯数据(`{ groups: [...], objects: [...] }`),Rust 侧对应 `seladb-core` 的驱动能力声明;两侧共用同一份语义,避免设计源与实现分叉。
 
 ---
 
@@ -94,11 +104,11 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 
 ```text
 ┌─ 标题栏 ─────────────────────────────────────────────────────┐
-│ SelaDB │ MySQL — 本地 ▾ │ [MySQL] │  ⌘K 全局搜索   │ ☀ 🌙 ⚙ │
+│ SelaDB │ ⌘K 搜索                    │ ☀ 🌙 ⚙ │ [+ 新建连接]  │
 ├─ 工具栏 ─────────────────────────────────────────────────────┤
-│ [新建连接][断开] │ [刷新][打开查询] │ [提交 ▾][回滚] │ 事务 Auto│
+│ [刷新][打开查询] │ [提交 ▾][回滚] │ 事务 Auto │ MySQL—本地 ▾ │
 ├────────────┬──────────────────────────────────────────────────┤
-│ 对象树      │ Tabs: users | users 结构 | 查询 1 | +           │
+│ 对象树      │ Tabs: [MySQL] users │ [PG] public.orders │ +   │
 │ ┌────────┐ │ ┌──────────────────────────────────────────────┐ │
 │ │🔍 搜索 │ │ │ 过滤条: [id > 100        ]  清除              │ │
 │ └────────┘ │ ├──────┬──────────┬──────────┬──────────────┤ │
@@ -106,9 +116,10 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 │  ▾ shop    │ │  1   │ 1001     │ 伟        │ 2025-03-28   │ │
 │   ▸ users  │ │  2   │ 1002     │ 娜        │ 2025-05-11   │ │
 │   ▸ orders │ │  …   │          │           │              │ │
-│ ▾ MongoDB  │ ├──────┴──────────┴──────────┴──────────────┤ │
-│  ▸ shop    │ │ 筛选:[__________]        1,284 行   导出 ▾   │ │
-│ ▸ Redis    │ └──────────────────────────────────────────────┘ │
+│ ▾ Postgres │ ├──────┴──────────┴──────────┴──────────────┤ │
+│  ▾ postgres│ │ 筛选:[__________]        1,284 行   导出 ▾   │ │
+│   ▾ public │ └──────────────────────────────────────────────┘ │
+│    ▸ users │                                                 │
 ├────────────┴──────────────────────────────────────────────────┤
 │ ● 已连接 127.0.0.1:3306 │ 1,284 行 │ 12ms │ UTF-8 │ 事务 Auto│
 └─────────────────────────────────────────────────────────────┘
@@ -116,8 +127,10 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 
 要点:
 
+- **全局工作区**:多个连接可同时打开,对象树顶部列出所有连接,各自可展开
 - **单栏对象树**,宽度可拖拽(用 `Splitter`)
-- 工具栏按「连接级 / 数据级」分区,提交回滚只在事务模式下出现
+- **Tab 不绑定连接**,标题带引擎+连接标识(如 `[MySQL] users`),跨连接对比直接开两个 Tab
+- **工具栏按「连接级 / 数据级」分区**;提交/回滚只作用于**当前 Tab 所属连接**,这个归属必须在 UI 上明示
 - 工作区 Tab 可拖拽排序、标脏、关闭前确认
 - 状态栏固定显示:连接状态 / 行数 / 耗时 / 字符集 / 事务模式
 
@@ -139,12 +152,12 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 |---|---|
 | `#/connect` | 新建连接向导(选类型 → 填参数 → 测试 → 保存) |
 | `#/connect/:id` | 连接参数编辑 |
-| `#/workbench/:conn` | 主工作台(对象树 + Tab 区) |
-| `#/workbench/:conn/data/:schema/:table` | 表数据 |
-| `#/workbench/:conn/structure/:schema/:table` | 表结构(列/索引/约束/外键) |
-| `#/workbench/:conn/ddl/:schema/:table` | DDL 预览 |
-| `#/workbench/:conn/query` | 查询编辑器 |
-| `#/workbench/:conn/search` | 全局对象搜索 |
+| `#/workbench` | 主工作台(对象树 + Tab 区);连接不是路径作用域,Tab 自身携带连接标识 |
+| `#/workbench/data/:conn/:schema/:table` | 表数据 |
+| `#/workbench/structure/:conn/:schema/:table` | 表结构(列/索引/约束/外键) |
+| `#/workbench/ddl/:conn/:schema/:table` | DDL 预览 |
+| `#/workbench/query` | 查询编辑器 |
+| `#/workbench/search` | 全局对象搜索 |
 | `#/settings` | 应用设置(主题、字体、密度、快捷键) |
 
 ---
@@ -155,7 +168,7 @@ ClickHouse(OLAP 列存,对象模型同 PG,成本低)、Elasticsearch(搜索)、O
 
 | 组件 | 关键能力 |
 |---|---|
-| `DataGrid` | 虚拟滚动、列宽拖拽、排序、筛选、行选择、**单元格内编辑**、NULL 样式、类型着色、复制、右键菜单、列显示/隐藏 |
+| `DataGrid` | 虚拟滚动、列宽拖拽、排序、筛选、行选择、**单元格内编辑**、NULL 样式、类型着色、复制、右键菜单、列显示/隐藏(**纯原生自研,零第三方表格依赖**) |
 | `TreeView` | 懒加载展开、搜索过滤、右键菜单、徽标计数 |
 | `TabBar` | 多标签、脏标记、关闭确认、拖拽排序 |
 | `Toolbar` / `MenuBar` | 分区布局、下拉菜单、快捷键提示 |
@@ -198,6 +211,12 @@ interface DataView {
 
 由 `TableDataView` / `DocumentDataView` / `KeyValueList` 分别实现。`DataGrid` 只是 `TableDataView` 的内部实现。
 
+### 数据网格:纯原生自研
+
+不用 AG Grid / TanStack Table。理由是**设计源要能复刻**:引入第三方表格库,设计源就会长成那个库的样子,Rust 实现阶段就变成在复刻 AG Grid 而不是复刻我们自己的设计;headless 库(TanStack)则只省逻辑不省外观,视觉仍要全手写,却多引入构建步骤与包体。
+
+代价要如实记:光虚拟滚动核心约 150 行,加上列宽拖拽、排序、筛选、单元格编辑、列显隐、右键菜单,整张表在 **500–700 行**量级。
+
 ---
 
 ## 7. 设计系统
@@ -210,6 +229,13 @@ interface DataView {
 :root[data-density="compact"] { --row-h:24px; --font-size:12px; }
 :root[data-density="comfortable"] { --row-h:30px; --font-size:13px; }
 ```
+
+**默认跟随系统主题。** 实现方式:JS 读 `matchMedia('(prefers-color-scheme: dark)')`,把结果写回 `<body data-theme>`,用户可在设置里显式覆盖为 light / dark / system。
+
+- 与 VS Code / Zed / GitHub Desktop / JetBrains 新版一致,用户不用表态
+- 实现成本几乎为零 —— 现有 token 结构本就是两套 `data-theme` 变量
+- 截图回归测试时显式把主题钉死,即可拿到确定性基准
+- Rust 实现侧走同一条链路,不会出现设计源与实现主题策略分叉
 
 ### 类型色板(数据网格专用)
 
@@ -239,11 +265,18 @@ interface DataView {
 
 ---
 
-## 9. 待拍板
+## 9. 已拍板决策
 
-1. **第一版引擎清单**:我建议 PostgreSQL / MySQL / SQLite / SQL Server / MongoDB / Redis 六个,是否加减?
-2. **数据网格自研还是用库?** 纯原生手写虚拟滚动约 150 行、零构建;AG Grid / TanStack Table 功能全但引入构建步骤与包体
-3. **主题默认**:浅色优先(DBeaver / Navicat 传统)还是深色优先(TablePlus / Beekeeper 现代派)?
-4. **是否支持多连接同时打开?** DBeaver 与 Navicat 都支持多标签页连接,这会显著影响外壳设计
-5. **对象树第一层统一为「分组」** 的方案是否接受?代价是 PostgreSQL 的 database 与 schema 会压成一层
-"""
+2026-10-22 评审确认,五条全部定案:
+
+| # | 议题 | 结论 |
+|---|---|---|
+| 1 | 第一版引擎清单 | **6 个全上**:PostgreSQL / MySQL / SQLite / SQL Server / MongoDB / Redis |
+| 2 | 数据网格实现 | **纯原生自研**,零第三方表格依赖,视觉全由 `tokens.css` 控制 |
+| 3 | 默认主题 | **跟随系统**,设置里可显式覆盖 |
+| 4 | 多连接模型 | **全局工作区 + Tab 带连接标识**,对象树顶部并列所有已打开连接 |
+| 5 | 对象树层级 | **保留引擎原生层级**,差异由每个引擎的树配置驱动,不进组件代码 |
+
+第 5 条是对初版方案的修正:初版曾提议「跨引擎压平成两层分组」,核对 DBeaver / pgAdmin / Navicat 的实际做法后推翻 —— PG 的 database 是可 CREATE/DROP 的独立实体,压掉它等于让 PG 支持不完整;而「各引擎深度不一」对任意深度的树组件本就不是问题。
+
+---
