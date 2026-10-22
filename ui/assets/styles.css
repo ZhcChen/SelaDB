@@ -172,7 +172,7 @@ button {
    下面第 270 行的 .btn 基础样式与本条同特异性,位置在后会把它整个盖掉 ——
    顶栏按钮于是全都渲染成带描边的实心按钮,「Ghost 样式」形同虚设。 */
 .btn.btn--tool {
-  height: 26px;
+  height: var(--h-control);
   padding: 0 var(--sp-3);
   font-size: var(--fs-sm);
   color: var(--fg-muted);
@@ -209,7 +209,7 @@ button {
    等于这个框根本没画出来。现在两边都归到 --bg-input,规则才真的成立。 */
 .topbar__search input {
   width: 100%;
-  height: 26px;
+  height: var(--h-control);
   padding: 0 var(--sp-6) 0 var(--sp-4);
   font-size: var(--fs-sm);
   background: var(--bg-input);
@@ -260,7 +260,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
-  height: 26px;
+  height: var(--h-control);
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
   color: var(--fg-default);
@@ -384,7 +384,7 @@ button {
 
 .tree__search input {
   width: 100%;
-  height: 28px;
+  height: var(--h-control);
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
   /* 搜索框是侧栏里唯一能接收输入的元素,做成「浮在面板上的一块白面 + 一条细边」。
@@ -1359,7 +1359,7 @@ button {
 
 .input,
 .select {
-  height: 28px;
+  height: var(--h-control);
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
   background: var(--bg-surface);

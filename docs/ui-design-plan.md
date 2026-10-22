@@ -317,6 +317,12 @@ interface DataView {
   是 10px),按钮在组内 4px。之前组与组也是 4px,顶栏右段(提交/回滚 ·
   Auto · 当前连接 · 搜索框 · 图标 · 设置)一路 4px 挤到底,密到读不出
   分组 —— 顶栏是要放很多控件的地方,间距就是分组本身。
+- **控件高度只有一个来源:`--h-control`**(comfortable 30px / compact 26px)。
+  工具条按钮、两个搜索框、表单输入、下拉全用它。之前是 26 / 28 混着用,
+  而顶栏有 44px 高却只配 26px 的控件 —— 19.5px 的文字塞在 26px 的框里,
+  上下各剩 3.25px,整个框是扁的,一眼就「太低」。
+  30px 放在 44px 的工具条里上下各留 7px,跟 JetBrains 新 UI
+  (40px 条 / 28px 控件)的比例是一个量级。
 - **侧栏默认 296px,树行 29px**。左列要放得下「连接 → 库 → schema → 表 →
   计数徽标」四五级缩进,宽度不够就只能截断;296px 是 DataGrip / DBeaver
   的量级。
@@ -362,7 +368,7 @@ interface DataView {
 --bg-raised:#262626; --bg-input:#242424; --bg-inset:#202020;
 --bg-selected:#2c2c2c; --border-subtle:#2a2a2a; --border-default:#303030;
 /* 密度 */
---row-h:26px/32px; --row-h-tree:24px/27px; --fs-base:13px/14px;
+--row-h:26px/32px; --row-h-tree:26px/29px; --h-control:26px/30px; --fs-base:13px/14px;
 ```
 
 背景这五个角色的分工别混:`canvas` 是工作区、`panel` 是外壳(顶栏/状态栏/对象树)、

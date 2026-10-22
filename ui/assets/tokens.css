@@ -373,6 +373,12 @@ body[data-density="comfortable"] {
   --row-h-sm: 26px;
   /* 树的一级缩进步长。层级要看得出来,靠的不只是缩进,还有导轨线。 */
   --row-h-tree: 29px;
+  /* 可交互控件的统一高度:工具条按钮、搜索框、表单输入、下拉。
+     之前是 26 / 28 混着用,顶栏 44px 高却只配 26px 的控件 ——
+     19.5px 的文字塞在 26px 的框里,上下各剩 3.25px,整个框是扁的。
+     30px 放在 44px 的工具条里上下各留 7px,跟 JetBrains 新 UI
+     (40px 条 / 28px 控件)的比例是一个量级。 */
+  --h-control: 30px;
   --cell-x: 10px;
   --indent: 16px;
   --tree-indent: 16px;
@@ -386,6 +392,7 @@ body[data-density="compact"] {
   --row-h: 26px;
   --row-h-sm: 22px;
   --row-h-tree: 26px;
+  --h-control: 26px;
   --cell-x: 8px;
   --indent: 14px;
   --tree-indent: 14px;

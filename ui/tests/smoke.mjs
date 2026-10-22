@@ -194,6 +194,33 @@ check(
   `brand height ${shellLines.brand?.h}`,
 );
 
+// 控件高度只有一个来源 --h-control:搜索框、工具条按钮、表单输入必须同高。
+// 之前是 26 / 28 混着用,顶栏 44px 高却只配 26px 的控件,框是扁的。
+const controlHeights = await page.evaluate(() => {
+  const h = (sel) => {
+    const el = document.querySelector(sel);
+    return el ? Math.round(el.getBoundingClientRect().height) : null;
+  };
+  return {
+    topbarSearch: h(".topbar__search input"),
+    treeSearch: h(".tree__search input"),
+    toolBtn: h(".btn--tool"),
+    conn: h(".btn--conn"),
+    topbar: h(".topbar"),
+  };
+});
+check(
+  "两个搜索框与工具条按钮同高(同一个 --h-control)",
+  controlHeights.topbarSearch === controlHeights.treeSearch &&
+    controlHeights.topbarSearch === controlHeights.toolBtn,
+  `搜索 ${controlHeights.topbarSearch}/${controlHeights.treeSearch} · 按钮 ${controlHeights.toolBtn}`,
+);
+check(
+  "顶栏里的控件不矮于顶栏高度的六成",
+  controlHeights.topbarSearch >= controlHeights.topbar * 0.6,
+  `控件 ${controlHeights.topbarSearch} / 顶栏 ${controlHeights.topbar}`,
+);
+
 // 拖动分隔条,侧栏宽度要跟着变
 const treeBefore = await page.locator(".tree").evaluate((el) => el.getBoundingClientRect().width);
 const splitter = page.locator(".splitter");
