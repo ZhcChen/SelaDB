@@ -4,12 +4,13 @@ SelaDB —— 跨平台（Windows / macOS / Linux）数据库管理软件。
 
 ## 技术栈（已定，勿随意更换）
 
-全项目 **Rust**。GUI 用 GPUI 直接走平台原生 GPU 渲染（macOS Metal / Windows D3D12 / Linux Vulkan），不用 WebView。
+全项目 **Rust**。GUI 用自研的 `gui-core` 直接走平台原生 GPU 渲染（macOS Metal / Windows D3D12 / Linux Vulkan），不用 WebView。框架分层与参考实现分工见 [`docs/gui-framework-architecture.md`](docs/gui-framework-architecture.md) 与 [`docs/gui-framework-comparison.md`](docs/gui-framework-comparison.md)。
 
 | 层 | 选型 |
 |---|---|
-| GUI 框架 | `gpui` v0.2.2（Zed 的框架，Apache-2.0） |
-| GUI 组件 | 自建，参考官方 `examples/data_table.rs` |
+| GUI 框架 | **自研 `crates/gui-core/`**（ADR-0006），布局 `taffy` / 文本 `cosmic-text` / 渲染 `wgpu` / 窗口 `winit` |
+| GUI 组件 | 自建，参考 nanoui 与 gpui `examples/data_table.rs`（两者都**没有**树和表格控件） |
+| 图标 | 自建，Lucide 风格线条图标（Zed 的 `icons` crate 是 GPL-3.0-or-later 且未发布，不可用） |
 | SQL 语法高亮 | `tree-sitter` + `tree-sitter-sql` |
 | CLI 框架 | `clap` v4.6.7 |
 | MCP | `rmcp` v3.6.0（官方 Rust SDK） |
@@ -20,13 +21,14 @@ SelaDB —— 跨平台（Windows / macOS / Linux）数据库管理软件。
 
 ## 硬约束
 
-1. **Cargo 多 crate 工作区**，不合并成单 crate。GUI 的 `gpui` 依赖很重（含 Metal shader 编译），不能污染 CLI / MCP Server 的构建。
-2. **只依赖宽松许可证的 crate**。Zed 的应用层 crate（`ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu`）是 GPL-3.0-or-later 且未发布，**一律不用**。可用的只有 Apache-2.0 的 `gpui` 及其依赖。
+1. **Cargo 多 crate 工作区**，不合并成单 crate。`gui-core` 依赖很重（含 wgpu 与字体栈编译），不能污染 CLI / MCP Server 的构建。
+2. **只依赖宽松许可证的 crate**。Zed 的应用层 crate（`ui` / `component` / `editor` / `text` / `language` / `theme` / `icons` / `menu`）是 GPL-3.0-or-later 且未发布，**一律不用**；`Slint`（含 GPL-3.0-only）同样不用。gpui 与 nanoui **只作参考蓝本，不作为依赖引入**。
 3. **业务逻辑只写在 `seladb-core/src/service/`**。CLI 命令、GUI 视图、MCP 工具都只做「解析参数 → 调 service → 格式化输出」，不放业务判断。
 4. **驱动用小 trait + 能力探测**（见 `docs/adr/0005-driver-interfaces.md`）。不要为了省事定义大 trait，Redis 实现不了 `list_columns`。
 5. **CLI 所有命令必须支持 `--json`**。Skill 包装、MCP 工具、CI 脚本三条路径都依赖它。
-6. **gpui 的调用收敛在 `seladb-gui` crate 内**，不外泄到 `core` / `driver` / `service`。
-7. **macOS GUI 构建需要 Metal Toolchain 组件**。`xcodebuild -downloadComponent MetalToolchain`（838.9 MB）。CI 的 macOS runner 必须预装，否则构建直接失败。
+6. **`gui-core` 的调用收敛在 `seladb-gui` crate 内**，不外泄到 `core` / `driver` / `service`。
+7. **macOS GUI 构建不再需要 Metal Toolchain**。wgpu 走 naga（WGSL→MSL/HLSL/SPIR-V 的纯 Rust 翻译），不需要 Xcode 的 `metal` 离线编译器。`xcodebuild -downloadComponent MetalToolchain`（838.9 MB）是 gpui/blade 路线的要求（其 `build.rs` 调 `xcrun metal` 编译 `.metal` 文件），自研路线下**不需要**，CI 的 macOS runner 也不必预装。若将来引入 blade/gpui 渲染后端，这条约束重新生效。
+8. **跑 GUI 用例一律无头**，不弹窗、不抢焦点、不驱动真实屏幕。框架侧照 nanoui 的 Tester 模式提供 `TestHarness`（不建窗口，喂合成事件、推进虚拟时钟、读回几何）。
 
 ## 目录约定
 
@@ -34,8 +36,8 @@ SelaDB —— 跨平台（Windows / macOS / Linux）数据库管理软件。
 crates/seladb-core/     领域模型、驱动、查询、服务编排
 crates/seladb-cli/      CLI 入口（clap）
 crates/seladb-mcp/      MCP Server 入口
-crates/seladb-gui/      GUI 入口（gpui）
-crates/gui-core/        自研 GUI 框架（taffy + cosmic-text + wgpu）
+crates/seladb-gui/      GUI 入口
+crates/gui-core/        自研 GUI 框架（taffy + cosmic-text + wgpu + winit）
 ui/                     UI 设计源（纯 HTML + CSS + JS，不进 Cargo 工作区）
 design/tokens.json      唯一设计源：颜色/间距/字号/圆角/阴影/动效
 docs/                   架构文档与 ADR

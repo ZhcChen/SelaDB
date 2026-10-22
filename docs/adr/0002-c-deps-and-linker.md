@@ -33,12 +33,12 @@ Go 时代的约束是 `CGO_ENABLED=0`：一旦引入 cgo 依赖，Windows 交叉
 
 1. **GUI 各平台原生构建，不做交叉编译**。图形栈交叉编译代价极高，macOS / Windows / Linux 各自原生构建即可。GUI 的工具链要求因此只影响构建机，不影响用户。
 2. **CLI 与 MCP Server 仍然可以交叉编译**。它们不需要 GUI 依赖，交叉编译到 6 个目标（darwin/linux × amd64/arm64 + windows × amd64/arm64）只需要对应的 Rust target 与链接器。
-3. **Metal Toolchain 是 gpui 独有的前置条件**，必须显式管理：本地一次性安装，CI runner 预装并检查。
+3. **Metal Toolchain 不是必需的**。它是 gpui/blade 路线的前置条件（其 `build.rs` 调 `xcrun metal` 离线编译 `.metal` 文件）。自研 gui-core 走 wgpu + naga（WGSL→MSL 的纯 Rust 翻译），**不需要**这个 838.9 MB 的组件，CI runner 也不必预装。（本条于 2026-10-22 修订，路线变更见 [ADR-0006](0006-self-built-gui-core.md)。）
 
 ## 后果
 
 - **交叉编译 Windows 需要额外一道工序**。这是 Rust 相对 Go 的实质劣势 —— Go 是 `GOOS=windows go build` 一条命令零工具链。缓解：CLI/MCP 的 Windows 包可以用 Windows runner 原生构建，不必依赖 macOS 交叉编译
-- **macOS GUI 构建在干净的 CI runner 上会失败**，除非预装 Metal Toolchain。CI 配置里必须显式处理
+- **~~macOS GUI 构建在干净的 CI runner 上会失败，除非预装 Metal Toolchain~~**。2026-10-22 修订：自研 gui-core 走 wgpu + naga，不再需要 Metal Toolchain，干净的 macOS runner 可直接构建
 - **`rusqlite` 需要 C 编译器**。CI 的 Linux runner 通常自带 gcc；Windows runner 自带 MSVC；macOS runner 需 Xcode CLT（Rust 工具链已要求）
 - **不再有 `CGO_ENABLED=0` 这个环境变量层面的护栏**。取而代之的是 crate 边界 —— GUI 的重依赖不污染 CLI/MCP 的构建
 

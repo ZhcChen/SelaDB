@@ -11,7 +11,7 @@
 最初选择 Go，理由是**编译快**。随后明确了 GUI 需求为「原生平台 GPU 渲染 + 不用 Web 技术栈」，经完整生态调研与实测后，发现：
 
 1. Go 生态里没有任何方案能同时满足「原生 GPU 渲染 + 高还原度 + 可锁版本 + 靠谱中文 IME」
-2. **Rust 侧有 GPUI**（Zed 的框架，Apache-2.0），同时满足上述四项
+2. **Rust 侧能自研出满足上述四项的框架**（taffy 与浏览器同源 + cosmic-text 整形 + wgpu 三平台统一后端 + 版本可锁）。当时的候选是 GPUI，路线于 2026-10-22 改为自研 `crates/gui-core/`，见 [ADR-0006](0006-self-built-gui-core.md)
 3. **「Rust 编译慢」在日常开发中不成立** —— 实测增量 0.62–0.99s，与 Go 的 0.83s 同一量级；慢的只是冷编译
 
 ## 决策
@@ -33,7 +33,7 @@ SelaDB/
 
 | 层 | 选型 | 版本 |
 |---|---|---|
-| GUI 框架 | `gpui` | 0.2.2 |
+| GUI 框架 | `gui-core`（自研；布局 taffy / 文本 cosmic-text / 渲染 wgpu） | — |
 | CLI 框架 | `clap` | 4.6.7 |
 | MCP SDK | `rmcp`（官方 Rust SDK） | 3.6.0 |
 | PostgreSQL | `tokio-postgres` | 0.7.18 |
