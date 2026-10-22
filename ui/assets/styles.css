@@ -796,19 +796,22 @@ button {
   top: 0;
   left: 0;
   right: 0;
-  --row-bg: var(--bg-surface);
+  --row-bg: var(--grid-row-bg);
   background: var(--row-bg);
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* 斑马纹:按数据序号的奇偶,不是 DOM 顺序 */
+.grid__row--body[data-parity="odd"] {
+  --row-bg: var(--grid-row-bg-alt);
+}
+
 .grid__row--body:hover {
-  --row-bg: var(--bg-hover);
-  background: var(--row-bg);
+  --row-bg: var(--grid-row-bg-hover);
 }
 
 .grid__row--body.is-selected {
-  --row-bg: var(--grid-cell-selected);
-  background: var(--row-bg);
+  --row-bg: var(--grid-row-bg-selected);
 }
 
 .grid__row--body.is-focused {
@@ -851,7 +854,11 @@ button {
 
 .grid__cell--head {
   position: relative;
-  gap: var(--sp-2);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: var(--sp-2) var(--cell-x);
   cursor: pointer;
   color: var(--grid-header-fg);
   font-size: var(--fs-sm);
@@ -859,6 +866,14 @@ button {
   background: var(--grid-header-bg);
   border-right: 1px solid var(--border-subtle);
   user-select: none;
+}
+
+.grid__col-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-width: 0;
 }
 
 .grid__cell--head:hover {
@@ -872,11 +887,13 @@ button {
   min-width: 32px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid__col-type {
-  font-size: var(--fs-xs);
+  font-size: 10px;
   font-weight: var(--fw-normal);
+  letter-spacing: 0.02em;
   /* 类型注解是结构元数据,要读得清 —— 用 muted 而不是 subtle */
   color: var(--fg-muted);
   font-family: var(--font-mono);
@@ -925,16 +942,19 @@ button {
   font-weight: var(--fw-semibold);
 }
 
+/* 数字右对齐:桌面数据工具的硬规矩,左对齐的金额列没法按位数比对 */
 .grid__cell--int {
   color: var(--type-int);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
 }
 
 .grid__cell--float {
   color: var(--type-float);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
 }
 
 /* 布尔要有语义对立:true 是绿的,false 是灰的。
@@ -2612,4 +2632,13 @@ body[data-theme="dark"] .grid__badge--zset {
 
 .struct-default--func {
   color: var(--syntax-function);
+}
+
+/* 数值列表头右对齐,和数值本身在同一条基准线上 */
+.grid__cell--head--num {
+  align-items: flex-end;
+}
+
+.grid__cell--head--num .grid__col-title {
+  justify-content: flex-end;
 }

@@ -207,7 +207,6 @@ class TableDataView extends DataView {
     this.body.replaceChildren();
 
     if (mode === "structure" && this.structure) {
-      this.head.querySelector(".panel__sub:last-of-type")?.remove();
       this.structureView = new StructureView({
         structure: this.structure,
         ddl: this.ddl,
@@ -228,7 +227,7 @@ class TableDataView extends DataView {
         engine: this.ctx.connection.engine,
       });
       this.structureView.mountDdl(this.body);
-      this.setMeta("由设计源按结构生成");
+      this.setMeta("");
       return;
     }
 
@@ -245,7 +244,8 @@ class TableDataView extends DataView {
       },
     });
     this.grid.mount(this.body);
-    this.setMeta(`${rows.length} / ${this.data.total} 行`);
+    // 行数只在底栏显示一次,右上角重复一遍是界面噪音
+    this.setMeta("");
   }
 
   /** 更新面板头右侧的元信息。 */
@@ -701,22 +701,23 @@ function buildTopbar() {
       onClick: () => openQueryTab(),
     }),
   );
-  actions.appendChild(
-    button("提交", {
-      className: "btn btn--tool",
-      icon: "check",
-      title: "提交当前连接的事务",
-      onClick: () => console.info("提交当前连接的事务"),
-    }),
-  );
-  actions.appendChild(
-    button("回滚", {
-      className: "btn btn--tool",
-      icon: "refresh",
-      title: "回滚当前连接的事务",
-      onClick: () => console.info("回滚当前连接的事务"),
-    }),
-  );
+  const txButtons = document.createElement("div");
+  txButtons.className = "topbar__group";
+  txButtons.dataset.role = "tx-actions";
+  const commitBtn = button("提交", {
+    className: "btn btn--tool",
+    icon: "check",
+    title: "提交当前连接的事务",
+    onClick: () => console.info("提交当前连接的事务"),
+  });
+  const rollbackBtn = button("回滚", {
+    className: "btn btn--tool",
+    icon: "refresh",
+    title: "回滚当前连接的事务",
+    onClick: () => console.info("回滚当前连接的事务"),
+  });
+  txButtons.append(commitBtn, rollbackBtn);
+  actions.appendChild(txButtons);
   bar.appendChild(actions);
 
   const spacer = document.createElement("div");
@@ -1409,6 +1410,14 @@ function updateStatusBar(tab) {
   status.appendChild(spacer);
 
   status.appendChild(statusItem("就绪"));
+
+  // 事务按钮只对关系型引擎有意义 —— MongoDB 的单文档原子性和 Redis 都没有
+  // 关系型事务,挂在那儿是误导
+  const txActions = document.querySelector('[data-role="tx-actions"]');
+  if (txActions) {
+    const relational = connection ? RELATIONAL_ENGINES.has(connection.engine) : false;
+    txActions.style.display = relational ? "" : "none";
+  }
 
   // 工具栏上的「当前连接」要跟状态栏一致:提交/回滚只作用于这个连接
   const connBtn = document.querySelector('[data-role="current-connection"]');

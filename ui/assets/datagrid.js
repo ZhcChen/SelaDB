@@ -412,12 +412,34 @@ class DataGrid {
       const cell = document.createElement("div");
       cell.className = "grid__cell grid__cell--head";
       cell.dataset.col = column.key;
+      // 数值列表头跟着数值右对齐,否则表头和值不在同一条基准线上
+      if (column.type && /int|numeric|decimal|real|double|float|money/i.test(column.type)) {
+        cell.classList.add("grid__cell--head--num");
+      }
       cell.title = `${column.name} · ${column.type ?? ""}`;
+
+      // 表头分两行:列名在上、类型在下。挤在一行时,列名会被类型文字吃掉
+      // 一半,横向扫表根本扫不出字段名。
+      const title = document.createElement("span");
+      title.className = "grid__col-title";
 
       const name = document.createElement("span");
       name.className = "grid__col-name";
       name.textContent = column.name ?? column.key;
-      cell.appendChild(name);
+      title.appendChild(name);
+
+      if (column.pk) {
+        const pk = document.createElement("span");
+        pk.className = "grid__col-pk";
+        pk.textContent = "PK";
+        pk.title = "主键";
+        title.appendChild(pk);
+      }
+
+      const sort = document.createElement("span");
+      sort.className = "grid__sort";
+      title.appendChild(sort);
+      cell.appendChild(title);
 
       // showType 为 false 时只保留类型带来的着色,不显示类型文字
       if (column.type && column.showType !== false) {
@@ -426,18 +448,6 @@ class DataGrid {
         type.textContent = column.type;
         cell.appendChild(type);
       }
-
-      if (column.pk) {
-        const pk = document.createElement("span");
-        pk.className = "grid__col-pk";
-        pk.textContent = "PK";
-        pk.title = "主键";
-        cell.appendChild(pk);
-      }
-
-      const sort = document.createElement("span");
-      sort.className = "grid__sort";
-      cell.appendChild(sort);
 
       const resize = document.createElement("span");
       resize.className = "grid__col-resize";
@@ -535,6 +545,9 @@ class DataGrid {
       row.el.style.display = "";
       row.el.style.transform = `translateY(${virtualIndex * rowHeight}px)`;
       row.el.dataset.index = String(virtualIndex);
+      // 斑马纹按数据序号算,不能用 nth-child —— 虚拟滚动时 DOM 里的行会换位,
+      // 用 nth-child 条纹会跟着滚动闪。
+      row.el.dataset.parity = virtualIndex % 2 === 0 ? "even" : "odd";
       this.#fillRow(row, virtualIndex);
     }
 

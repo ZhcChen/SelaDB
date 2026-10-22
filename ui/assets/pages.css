@@ -497,16 +497,18 @@
  * 字符串会丢掉层级,用户在几十个字段里根本找不到要看的那一项。
  * -------------------------------------------------------------------------- */
 .doc-list {
-  padding: var(--sp-4);
+  padding: var(--sp-3);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--sp-2);
 }
 
+/* 文档之间用一条分隔线,不要一张张带边框的卡片 ——
+   卡片化的排版一屏只装得下一两个文档,翻查效率极低。 */
 .doc {
   background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -523,7 +525,8 @@
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
-  color: var(--fg-default);
+  /* ObjectId 用中性色加粗,跟普通字符串的常规前景色区分开 */
+  color: var(--type-uuid);
 }
 
 .doc__actions {
@@ -568,13 +571,13 @@
    数组节点因为要一直显示摘要,子节点会被推到最右边。 */
 .doc-node {
   display: grid;
-  grid-template-columns: 14px 160px minmax(0, 1fr);
+  grid-template-columns: 14px 150px minmax(0, 1fr);
   column-gap: var(--sp-2);
-  align-items: start;
-  padding: 1px var(--sp-4) 1px 0;
+  align-items: baseline;
+  padding: 0 var(--sp-4) 0 0;
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  line-height: var(--lh-base);
+  line-height: 20px;
 }
 
 .doc-node__toggle {
@@ -626,7 +629,8 @@
   grid-column: 2 / -1;
   grid-row: 2;
   padding-left: var(--sp-4);
-  border-left: 1px solid var(--border-subtle);
+  /* 导轨线要看得见,深一层嵌套才知道归属谁 */
+  border-left: 1px solid var(--border-default);
 }
 
 .doc__value--string {
@@ -648,7 +652,12 @@
 
 .doc__value--object,
 .doc__value--array {
-  color: var(--type-json);
+  /* 摘要不是错误也不是警告,用中性色 —— 品红会让人以为出问题了 */
+  color: var(--fg-muted);
+}
+
+.doc__value--date {
+  color: var(--type-time);
 }
 
 /* -----------------------------------------------------------------------------

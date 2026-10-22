@@ -62,13 +62,16 @@
   --info-soft: #e6f3f9;
   --info-border: #a9d3e6;
 
-  /* 网格专用状态 */
-  --grid-stripe: rgba(16, 24, 40, 0.022);
-  --grid-cell-selected: #e4edff;
+  /* 网格的行态色必须是「不透明」的:行号列是 sticky 的,要用与行相同的
+     背景色遮住横向滚过去的列;半透明色会叠两次,冻结列比别处深一块。 */
+  --grid-row-bg: #ffffff;
+  --grid-row-bg-alt: #f7f8fa;
+  --grid-row-bg-hover: #eef0f4;
+  --grid-row-bg-selected: #e4edff;
   --grid-cell-editing: #ffffff;
   --grid-header-bg: #f7f8fa;
   --grid-header-fg: var(--fg-muted);
-  --grid-null-fg: #8b95a6;
+  --grid-null-fg: #6b7280;
 
   /* 选区与拖拽 */
   --selection-bg: rgba(47, 95, 224, 0.18);
@@ -119,11 +122,13 @@ body[data-theme="dark"] {
   --info-soft: #10222b;
   --info-border: #26485a;
 
-  --grid-stripe: rgba(255, 255, 255, 0.018);
-  --grid-cell-selected: #1c2b4d;
-  --grid-cell-editing: #10141c;
-  --grid-header-bg: #171d27;
-  --grid-null-fg: #69737f;
+  --grid-row-bg: #151b24;
+  --grid-row-bg-alt: #191f29;
+  --grid-row-bg-hover: #1e242f;
+  --grid-row-bg-selected: #1c2b4d;
+  --grid-cell-editing: #10151d;
+  --grid-header-bg: #1a212b;
+  --grid-null-fg: #8b95a6;
 
   --selection-bg: rgba(91, 140, 255, 0.28);
 }
@@ -153,7 +158,8 @@ body[data-theme="dark"] {
   --type-null: #8b95a6;
   --type-binary: #c2410c;
   --type-json: #be185d;
-  --type-uuid: #0d9488;
+  /* UUID 本质是字符串,降权成中性灰,把彩度让给数字与时间 */
+  --type-uuid: #64748b;
 }
 
 body[data-theme="dark"] {
@@ -166,7 +172,7 @@ body[data-theme="dark"] {
   --type-null: #69737f;
   --type-binary: #ffa657;
   --type-json: #f9a8d4;
-  --type-uuid: #5eead4;
+  --type-uuid: #94a3b8;
 }
 
 /* -----------------------------------------------------------------------------
@@ -313,7 +319,8 @@ body[data-density="comfortable"] {
   --tree-indent: 14px;
   --fs-base: 13px;
   --fs-sm: 12px;
-  --header-h: 32px;
+  /* 表头分两行:列名一行、类型一行 */
+  --header-h: 38px;
 }
 
 body[data-density="compact"] {
@@ -325,7 +332,7 @@ body[data-density="compact"] {
   --tree-indent: 12px;
   --fs-base: 12px;
   --fs-sm: 11px;
-  --header-h: 28px;
+  --header-h: 34px;
 }
 
 /* -----------------------------------------------------------------------------

@@ -355,6 +355,11 @@ function describeScalar(value) {
   if (value === null) return { text: "null", type: "null" };
   switch (typeof value) {
     case "string":
+      // BSON 的日期是 ISO 字符串,给它独立一档 —— 不然日期跟普通文本同色,
+      // 在几十个字段里根本认不出哪个是时间
+      if (/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2})?/.test(value)) {
+        return { text: value, type: "date" };
+      }
       return { text: value, type: "string" };
     case "number":
       return { text: String(value), type: "number" };
