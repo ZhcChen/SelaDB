@@ -14,28 +14,44 @@
  * 1. 语义色板 —— 浅色(默认值)
  * -------------------------------------------------------------------------- */
 :root {
-  /* 背景层级:canvas 最底,surface 是面板,raised 是浮层,sunken 是凹陷区 */
   /*
-   * 中性灰,一点蓝调都不要。
+   * 背景层级,从「底」到「浮」:
+   *   canvas  工作区画布,最亮
+   *   panel   外壳面板:顶栏 / 状态栏 / 左侧对象树
+   *   surface 次级面:输入框、查询区、子标签、网格容器
+   *   inset   内嵌块:行号槽、主键行、元信息条
+   *   raised  浮层:菜单 / 弹窗 / 卡片,靠阴影浮起
+   *   input   输入位:工具条里的搜索框,白底带边框
    *
+   * 中性灰打底,只带一丝几乎察觉不到的冷调(B 比 R 高 3~4 级)。
    * 之前用带蓝的灰(#eaedf2 / #e2e6ed),整个界面泛着一层冷蓝,
-   * 看着像「网页后台」而不是桌面工具。MCode 那一套是纯 R=G=B 的中性灰。
+   * 看着像「网页后台」而不是桌面工具;但纯 R=G=B 的死灰在浅色端
+   * 又会显脏。带 3 级冷调是这两头之间的落点 —— VS Code 2026 的
+   * #FAFAFD 与 Radix gray-2 的 #F9FAFB 都落在这个位置。
    *
-   * 层次靠三档背景:内容区最亮,侧栏略暗,浮层卡片最亮(有边框托着)。
+   * 侧栏为什么不再用「一整片灰」:
+   *   原来侧栏 #f3f3f4、画布 #ffffff,靠 12 级底色差分界。那点差在
+   *   96% 亮度附近根本推不出边界,侧栏与内容区之间是一条没有形状的
+   *   过渡,整片灰又重又糊。现在改成:外壳色提到 #f6f8fa(比画布只暗
+   *   9 级),分界交给一条 1px 结构线 —— VS Code / ADS / Beekeeper /
+   *   Primer 全部是「淡底 + 1px 边线」,没有一个是靠底色差硬扛的。
    */
   --bg-canvas: #ffffff;
-  --bg-surface: #f3f3f4;
+  --bg-panel: #f6f8fa;
+  --bg-surface: #f1f3f5;
   --bg-raised: #ffffff;
-  --bg-sunken: #ededee;
-  --bg-inset: #f0f0f1;
-  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-input: #ffffff;
+  --bg-inset: #e9edf1;
+  --bg-hover: rgba(0, 0, 0, 0.055);
   --bg-active: rgba(2, 119, 217, 0.1);
   /* 选中态是中性药丸,不染色 */
-  --bg-selected: #e4e4e6;
+  --bg-selected: #e2e6eb;
   --bg-overlay: rgba(0, 0, 0, 0.32);
 
-  /* 分割线要淡到「几乎看不见但确实在」 */
-  --border-subtle: #ebebed;
+  /* 分割线要淡到「几乎看不见但确实在」。
+     结构线比「几乎看不见」还要往上抬一档 —— 外壳与工作区的分界
+     全靠它,差 5 级等于没有。 */
+  --border-subtle: #e4e8ec;
   --border-default: #d9d9dd;
   --border-strong: #c2c2c7;
   --border-focus: var(--accent);
@@ -108,11 +124,15 @@ body[data-theme="dark"] {
    *   内容区 rgb(28,28,28) · 侧栏 rgb(23,23,23) · 浮层卡片 rgb(38,38,38)
    *   主文字 rgb(237,237,237) · 次文字 rgb(148,148,148) · 更淡 rgb(102,102,102)
    * 全部是中性灰,没有任何蓝调。
+   *
+   * 深色端的层次靠「更暗 = 更靠里」:外壳比画布暗,输入位比外壳亮
+   * (是个浮在面板上的字段),内嵌块比次级面亮一档。
    */
   --bg-canvas: #1c1c1c;
+  --bg-panel: #151515;
   --bg-surface: #151515;
   --bg-raised: #262626;
-  --bg-sunken: #121212;
+  --bg-input: #242424;
   --bg-inset: #202020;
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(2, 119, 217, 0.2);
@@ -120,7 +140,7 @@ body[data-theme="dark"] {
   --bg-selected: #2c2c2c;
   --bg-overlay: rgba(0, 0, 0, 0.6);
 
-  --border-subtle: #242424;
+  --border-subtle: #2a2a2a;
   --border-default: #303030;
   --border-strong: #454545;
 

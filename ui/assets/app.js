@@ -1707,8 +1707,9 @@ function renderSpec(root) {
 
   // 色板
   inner.appendChild(buildSwatchSection("主题与语义色", [
-    ["--bg-canvas", "画布"], ["--bg-surface", "面板"], ["--bg-sunken", "凹陷"],
-    ["--bg-selected", "选中"], ["--border-default", "边框"], ["--fg-default", "前景"],
+    ["--bg-canvas", "画布"], ["--bg-panel", "外壳面板"], ["--bg-surface", "次级面"],
+    ["--bg-inset", "内嵌块"], ["--bg-input", "输入位"], ["--bg-selected", "选中"],
+    ["--border-default", "边框"], ["--fg-default", "前景"],
     ["--fg-muted", "次要前景"], ["--accent", "强调色"], ["--danger", "危险"],
     ["--warning", "警告"], ["--success", "成功"], ["--info", "信息"],
   ]));

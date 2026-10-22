@@ -141,7 +141,7 @@ button {
   gap: var(--sp-2);
   height: var(--h-topbar);
   padding: 0 var(--sp-4);
-  background: var(--bg-surface);
+  background: var(--bg-panel);
 }
 
 .topbar__brand {
@@ -213,26 +213,28 @@ button {
 }
 
 /* 搜索框做成工具条里的扁平控件,而不是一个独立的圆角输入框。
-   顶栏与侧栏同色,输入框不能用 --bg-inset(只比顶栏深三个色阶,等于看不见),
-   改用画布色 —— 浅灰顶栏上的一块白,是桌面工具搜索框的常规样子。 */
+   顶栏与侧栏都是外壳面板色,输入位靠 --bg-input(白底)+ 1px 边从面板上浮起来。 */
 .topbar__search {
   position: relative;
   width: 180px;
   flex: none;
 }
 
-/* 顶栏搜索框:跟侧栏搜索框同一套语言 —— 无边框,靠底色比所在区域深一档
-   做成「凹槽」。顶栏右段是 canvas 白,所以凹槽用 --bg-surface;
-   侧栏本身是 surface,凹槽就用更深的 --bg-sunken。规则一致。 */
+/* 顶栏搜索框跟侧栏搜索框是同一套语言:白底 + 1px 边。
+   原来顶栏用 --bg-surface、侧栏用 --bg-sunken,注释写的是「顶栏右段是
+   canvas 白」—— 那条前提是错的,顶栏本身就是 surface,输入框跟它同色,
+   等于这个框根本没画出来。现在两边都归到 --bg-input,规则才真的成立。 */
 .topbar__search input {
   width: 100%;
   height: 26px;
   padding: 0 var(--sp-6) 0 var(--sp-4);
   font-size: var(--fs-sm);
-  background: var(--bg-surface);
-  border: none;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: var(--r-sm);
   color: var(--fg-default);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
 .topbar__search input::placeholder {
@@ -240,13 +242,13 @@ button {
 }
 
 .topbar__search:hover input {
-  background: var(--bg-sunken);
+  border-color: var(--border-strong);
 }
 
 .topbar__search input:focus {
   outline: none;
-  background: var(--bg-raised);
-  box-shadow: var(--ring);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .topbar__search-hint {
@@ -357,14 +359,18 @@ button {
   min-width: var(--w-tree-min);
   max-width: var(--w-tree-max);
   flex: none;
-  /* 侧栏跟主内容不同底色,靠底色分界,不用线也不用阴影 */
-  background: var(--bg-surface);
-  border-right: none;
+  /* 外壳面板色。侧栏与工作区之间靠这条 1px 结构线分界,不靠底色差 ——
+     浅色端 12 级底色差推不出边界,整片灰又重又糊。 */
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-subtle);
   overflow: hidden;
 }
 
 .tree__search {
-  padding: var(--sp-2) var(--sp-2);
+  /* 右侧留 8px:侧栏右边多了一条 1px 分割线,输入框再贴着 4px 走,
+     深色主题下「亮边框 + 4px 面板 + 暗分割线」三层挤在一条窄带里,
+     看着局促。左边仍留 4px,跟树节点的缩进起点对齐。 */
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-2);
   border-bottom: none;
 }
 
@@ -373,16 +379,17 @@ button {
   height: 28px;
   padding: 0 var(--sp-4);
   font-size: var(--fs-sm);
-  /* 搜索框是侧栏里唯一能接收输入的元素,做成「陷进侧栏的一个凹槽」:
-     底色比侧栏深一档,不用边框也不用阴影。
-     原来那层 1px 细影 + Y 偏移的弥散影,两头都犯规 —— 会被读成边框,
-     而且阴影往下投违反「四周对称」,干脆一层都不要。 */
-  background: var(--bg-sunken);
-  border: none;
+  /* 搜索框是侧栏里唯一能接收输入的元素,做成「浮在面板上的一块白面 + 一条细边」。
+     原来是「比侧栏深一档的凹槽」,但侧栏底色一抬高到 #f6f8fa,
+     凹槽比面板只深十几个色阶,人眼根本判读不出来 —— 那块灰只是糊在
+     面板上的一个色斑,不是「能输入的字段」。
+     白底 + 1px 边是 VS Code 2026 / macOS / Primer 的共同做法:
+     深色端浅色端都不靠底色差撑着,靠的是「比周围亮 + 有边」。 */
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: var(--r-md);
-  box-shadow: none;
   color: var(--fg-default);
-  transition: background var(--dur-fast) var(--ease-out),
+  transition: border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
 }
 
@@ -390,11 +397,14 @@ button {
   color: var(--fg-subtle);
 }
 
+.tree__search input:hover {
+  border-color: var(--border-strong);
+}
+
 .tree__search input:focus {
   outline: none;
-  /* 聚焦时从凹槽「抬起来」变成白面,焦点环用现成的 --ring(box-shadow 实现) */
-  background: var(--bg-raised);
-  box-shadow: var(--ring);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .tree__scroll {
@@ -519,8 +529,9 @@ button {
 }
 
 /* 计数做成淡底胶囊:弱灰数字在密集列表里根本扫不到。
-   底色用半透明黑(叠在侧栏底上),比 --bg-inset 明显一档 ——
-   --bg-inset 和搜索框凹槽是同一个色,两个不同语义的元素撞在一起像出错了。 */
+   底色用半透明黑(叠在侧栏底上),跟树的悬停行同一档重量 ——
+   行悬停时底色会铺满整行,徽标要是自己有底,就成了「灰底块里再套一个
+   灰底胶囊」,两层灰色叠在一起像打了补丁,所以 hover/选中时它要脱掉。 */
 .tree__count {
   flex: none;
   padding: 0 var(--sp-2);
@@ -614,16 +625,20 @@ button {
 /* 当前连接:带引擎图标,跟对象树里的连接节点呼应。
    它是「当前在哪个连接上」的上下文指示器,不是普通动作按钮 ——
    Ghost 化之后它跟「提交/回滚」视觉上完全一样,层级就丢了。
-   给它一块微底色的药丸,跟动作按钮拉开。 */
-.btn--conn {
+   给它一块微底色的药丸,跟动作按钮拉开。
+
+   选择器必须写成 `.btn.btn--conn`:顶栏工具按钮是 `.btn.btn--tool`(0,2,0),
+   会把 `.btn--conn`(0,1,0)的 background 与 color 整个盖掉 ——
+   药丸底色从来没渲染出来过,顶栏上的「当前连接」是光秃秃一行字。 */
+.btn.btn--conn {
   color: var(--fg-default);
   padding-left: var(--sp-2);
-  /* 比搜索框的凹槽更重一档 —— 搜索框是浅灰的「凹」,它是深灰的「实」 */
-  background: var(--bg-selected);
+  /* 微底色:半透明黑叠在顶栏底上,跟计数徽标、树的悬停行同一档重量 */
+  background: var(--bg-hover);
 }
 
-.btn--conn:hover {
-  background: var(--border-default);
+.btn.btn--conn:hover {
+  background: var(--bg-selected);
   color: var(--fg-default);
   border-color: transparent;
 }
@@ -634,8 +649,10 @@ button {
   flex: none;
 }
 
-/* 提交是不可逆操作,给一层视觉权重;回滚可逆,保持弱 */
-.btn--commit {
+/* 提交是不可逆操作,给一层视觉权重;回滚可逆,保持弱。
+   同样要写成 `.btn.btn--commit` 压过 `.btn.btn--tool` 的 muted 前景色 ——
+   否则「提交」跟「回滚」是同一个灰,不可逆操作没有拿到该有的权重。 */
+.btn.btn--commit {
   color: var(--fg-default);
 }
 
@@ -1196,7 +1213,7 @@ button {
   align-items: center;
   gap: var(--sp-5);
   padding: 0 var(--sp-4);
-  background: var(--bg-surface);
+  background: var(--bg-panel);
   font-size: var(--fs-xs);
   color: var(--fg-muted);
 }

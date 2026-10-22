@@ -199,6 +199,45 @@ check("NULL 单元格有独立样式", nullCells > 0, `可见 ${nullCells} 个`)
 const intCells = await page.locator(".grid__cell--int").count();
 check("整数列有类型着色", intCells > 0, `可见 ${intCells} 个`);
 
+/*
+ * 顶栏按钮变体的样式必须真的生效。
+ *
+ * 这类坑出现过两次:顶栏工具按钮写成 `.btn.btn--tool`(0,2,0)之后,
+ * `.btn--conn`(0,1,0)的底色与前景色被整个盖掉 —— 注释和文档里写的
+ * 「当前连接是微底色药丸」「提交是深色文字」从来没渲染出来过。
+ * 注释写着 ≠ 样式生效,这条断言就是防这个的。
+ */
+const btnVariants = await page.evaluate(() => {
+  const read = (sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const cs = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return {
+      bg: cs.backgroundColor,
+      color: cs.color,
+      visible: rect.width > 0 && rect.height > 0,
+    };
+  };
+  return {
+    conn: read(".btn--conn"),
+    commit: read(".btn--commit"),
+    tool: read(".btn--tool"),
+  };
+});
+const transparent = (c) => !c || c === "rgba(0, 0, 0, 0)" || c === "transparent";
+check(
+  "顶栏「当前连接」是带底色的药丸",
+  btnVariants.conn?.visible && !transparent(btnVariants.conn.bg),
+  `bg ${btnVariants.conn?.bg}`,
+);
+check(
+  "「提交」是深色文字(不可逆操作有额外权重)",
+  btnVariants.commit?.visible &&
+    btnVariants.commit.color !== btnVariants.tool?.color,
+  `提交 ${btnVariants.commit?.color} / 回滚 ${btnVariants.tool?.color}`,
+);
+
 // 虚拟滚动:mock 行扩到了 600 行,DOM 里只保留视口附近的行
 const totalRows = await footCount();
 const domRows = await page.evaluate(

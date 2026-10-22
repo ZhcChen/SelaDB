@@ -128,24 +128,59 @@ async function review(filePath, context) {
  *
  * 多模态工具一次只吃一张图,所以「A 和 B 哪个好」得靠拼接实现。
  * 借用 Playwright 渲染一段 HTML 再截图,不引入图像处理库。
+ *
+ * **必须带放大行。** 1440px 宽的截图塞进 790px 的栏里会缩到 55%,
+ * 1px 的结构分隔线被缩成半像素后抗锯齿掉 —— 模型看不见那条线,
+ * 只看得到「灰色块变少了」,于是把「底色差改成 1px 线」误判成
+ * 「容器感变弱、界面单薄」。上半给全景比布局,下半给 2 倍放大的角落
+ * 比细节(侧栏分界线、输入框边框)。
  */
 async function makeComposite(beforePath, afterPath, outPath) {
   const before = (await readFile(beforePath)).toString("base64");
   const after = (await readFile(afterPath)).toString("base64");
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  const page = await browser.newPage({ viewport: { width: 1460, height: 1400 } });
   await page.setContent(`<!DOCTYPE html>
-<html><body style="margin:0;background:#dfe3e9;display:flex;gap:10px;padding:10px;
-  font:600 13px/1.6 -apple-system,'PingFang SC',sans-serif;color:#1c2230">
-  <figure style="margin:0;flex:1">
-    <figcaption style="padding:4px 2px">改动前</figcaption>
-    <img src="data:image/png;base64,${before}" style="width:100%;display:block;border:1px solid #b8c0cd">
-  </figure>
-  <figure style="margin:0;flex:1">
-    <figcaption style="padding:4px 2px">改动后</figcaption>
-    <img src="data:image/png;base64,${after}" style="width:100%;display:block;border:1px solid #b8c0cd">
-  </figure>
+<html><body style="margin:0;background:#dfe3e9;font:600 13px/1.6 -apple-system,'PingFang SC',sans-serif;color:#1c2230">
+  <div style="display:flex;gap:10px;padding:10px">
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动前</figcaption>
+      <img src="data:image/png;base64,${before}" style="width:100%;display:block;border:1px solid #b8c0cd">
+    </figure>
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动后</figcaption>
+      <img src="data:image/png;base64,${after}" style="width:100%;display:block;border:1px solid #b8c0cd">
+    </figure>
+  </div>
+  <div style="display:flex;gap:10px;padding:0 10px 8px">
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动前 · 左上 2×(侧栏顶部 / 搜索框 / 分界线)</figcaption>
+      <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
+        <img src="data:image/png;base64,${before}" style="position:absolute;top:0;left:0;width:1440px;height:900px;transform-origin:0 0;transform:scale(2)">
+      </div>
+    </figure>
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动后 · 左上 2×</figcaption>
+      <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
+        <img src="data:image/png;base64,${after}" style="position:absolute;top:0;left:0;width:1440px;height:900px;transform-origin:0 0;transform:scale(2)">
+      </div>
+    </figure>
+  </div>
+  <div style="display:flex;gap:10px;padding:0 10px 10px">
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动前 · 右上 2×(顶栏搜索框)</figcaption>
+      <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
+        <img src="data:image/png;base64,${before}" style="position:absolute;top:0;right:0;width:1440px;height:900px;transform-origin:100% 0;transform:scale(2)">
+      </div>
+    </figure>
+    <figure style="margin:0;flex:1">
+      <figcaption style="padding:4px 2px">改动后 · 右上 2×</figcaption>
+      <div style="width:100%;height:446px;overflow:hidden;position:relative;border:1px solid #b8c0cd">
+        <img src="data:image/png;base64,${after}" style="position:absolute;top:0;right:0;width:1440px;height:900px;transform-origin:100% 0;transform:scale(2)">
+      </div>
+    </figure>
+  </div>
 </body></html>`);
   await page.screenshot({ path: outPath, fullPage: true });
   await browser.close();
@@ -170,10 +205,20 @@ async function compare(beforePath, afterPath, context) {
   const prompt = `这是一张对照图:左边是改动前,右边是改动后。界面是:
 ${context}
 
+对照图分两层:
+- 上半:两张全窗口缩略图,用来比整体分块与信息层级
+- 下半:左右上角与右上角的 2 倍放大图,用来比细节(分隔线、输入框边框、底色差)
+
+**1px 的结构分隔线在缩略图上几乎看不见,判断这类改动必须以下半的放大图为准。**
+
 请只比较视觉与信息表达,不看功能是否实现。回答:
 1. 哪一边更好?给出 "before" 或 "after"
 2. 好在哪,差在哪(各 1–2 句)
 3. 改动后有没有引入新的问题
+
+硬规矩:**只报告你能在图上明确指认的差异**。1px 级别的结构线请以放大行为依据;
+如果你无法确认某处到底有没有变化,就把该处从结论里去掉,不要凭印象补一个"看起来像"的问题。
+说不出具体位置的问题不要写。
 
 只返回 JSON:{"better": "before"|"after", "why": "", "regression": ""}`;
 
