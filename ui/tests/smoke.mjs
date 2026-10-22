@@ -87,6 +87,28 @@ const iconColors = await page.evaluate(() => {
 });
 check("引擎图标各自带品牌色", new Set(iconColors).size > 1, `实际 ${new Set(iconColors).size} 种颜色`);
 
+// 图标在 16px 下的实际墨量:太小说明归一化变换或 pre 修正没生效
+const inkSizes = await page.evaluate(() => {
+  const holder = document.createElement("div");
+  holder.style.cssText = "position:absolute;left:-9999px;top:0";
+  document.body.appendChild(holder);
+  const out = {};
+  for (const id of ["postgresql", "mysql", "sqlite", "mongodb", "redis", "sqlserver"]) {
+    const svg = createEngineIcon(id, 16);
+    holder.appendChild(svg);
+    const bb = svg.getBBox();
+    out[id] = { w: +bb.width.toFixed(2), h: +bb.height.toFixed(2) };
+  }
+  holder.remove();
+  return out;
+});
+const tooSmall = Object.entries(inkSizes).filter(([, v]) => v.w < 7 || v.h < 9);
+check(
+  "六枚引擎图标在 16px 下的墨量都够",
+  tooSmall.length === 0,
+  tooSmall.map(([k, v]) => `${k} ${v.w}x${v.h}`).join(", "),
+);
+
 // 外壳是上中下三段:顶栏与底栏整条跟侧栏同色,与中间区之间没有分割线
 const shellLines = await page.evaluate(() => {
   const read = (sel, prop) => {
