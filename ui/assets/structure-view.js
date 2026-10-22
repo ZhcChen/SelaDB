@@ -13,8 +13,6 @@
  * Rust 侧的 service 层给出,这里只做展示。
  */
 
-import { createIcon } from "./icons.js";
-import { highlightSql } from "./query-editor.js";
 
 /**
  * 子标签定义。
@@ -95,7 +93,7 @@ function cell(text, className) {
 }
 
 /** 空状态提示。没有条目时显示它,而不是留一张空表。 */
-function buildEmpty(message) {
+function buildStructEmpty(message) {
   const empty = document.createElement("div");
   empty.className = "struct-empty";
   empty.textContent = message;
@@ -107,7 +105,7 @@ function buildEmpty(message) {
  * @param {string[]} headers 表头文字
  * @param {HTMLElement} body 已经填好的 tbody
  */
-function buildTable(headers, body) {
+function buildStructTable(headers, body) {
   const table = document.createElement("table");
   table.className = "struct-table";
 
@@ -222,7 +220,7 @@ async function copyToClipboard(text) {
 /* -----------------------------------------------------------------------------
  * StructureView
  * -------------------------------------------------------------------------- */
-export class StructureView {
+class StructureView {
   constructor({ structure, ddl, engine } = {}) {
     this.structure = normalizeStructure(structure);
     this.ddl = String(ddl ?? "");
@@ -282,7 +280,7 @@ export class StructureView {
     this.root = root;
 
     const ddl = this.#buildDdl();
-    root.appendChild(ddl ?? buildEmpty("没有 DDL"));
+    root.appendChild(ddl ?? buildStructEmpty("没有 DDL"));
 
     container.appendChild(root);
     this.mounted = true;
@@ -378,10 +376,10 @@ export class StructureView {
       if (tab.name === "ddl") {
         const ddl = this.#buildDdl();
         if (ddl) panel.appendChild(ddl);
-        else panel.appendChild(buildEmpty(tab.empty));
+        else panel.appendChild(buildStructEmpty(tab.empty));
       } else {
         const table = this.#buildDataTable(tab);
-        panel.appendChild(table ?? buildEmpty(tab.empty));
+        panel.appendChild(table ?? buildStructEmpty(tab.empty));
       }
 
       wrap.appendChild(panel);
@@ -516,7 +514,7 @@ export class StructureView {
       body.appendChild(tr);
     });
 
-    return buildTable(["位置", "列名", "类型", "可空", "默认值", "键"], body);
+    return buildStructTable(["位置", "列名", "类型", "可空", "默认值", "键"], body);
   }
 
   /** 索引:名称 / 列 / 唯一 / 方法 / 主键 */
@@ -539,7 +537,7 @@ export class StructureView {
       body.appendChild(tr);
     }
 
-    return buildTable(["名称", "列", "唯一", "方法", "主键"], body);
+    return buildStructTable(["名称", "列", "唯一", "方法", "主键"], body);
   }
 
   /** 约束:名称 / 类型 / 表达式 */
@@ -559,7 +557,7 @@ export class StructureView {
       body.appendChild(tr);
     }
 
-    return buildTable(["名称", "类型", "表达式"], body);
+    return buildStructTable(["名称", "类型", "表达式"], body);
   }
 
   /** 外键:名称 / 列 / 引用表 / 引用列 / 更新规则 / 删除规则 */
@@ -582,7 +580,7 @@ export class StructureView {
       body.appendChild(tr);
     }
 
-    return buildTable(["名称", "列", "引用表", "引用列", "更新规则", "删除规则"], body);
+    return buildStructTable(["名称", "列", "引用表", "引用列", "更新规则", "删除规则"], body);
   }
 
   /* ---- DDL ---- */

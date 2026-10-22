@@ -10,7 +10,6 @@
  * 渲染成空行 —— 这正是真实工具在翻页加载时的样子。
  */
 
-import { openMenu } from "./menu.js";
 
 const OVERSCAN = 10;
 const MIN_COL_WIDTH = 60;
@@ -162,33 +161,11 @@ function matchCondition(row, condition) {
  * 剪贴板
  * -------------------------------------------------------------------------- */
 
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // 非安全上下文(比如 file:// 或 http)下 clipboard API 不可用,退回老办法
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch {
-      ok = false;
-    }
-    area.remove();
-    return ok;
-  }
-}
 
 /* -----------------------------------------------------------------------------
  * DataGrid
  * -------------------------------------------------------------------------- */
-export class DataGrid {
+class DataGrid {
   constructor(config = {}) {
     this.config = config;
     this.columns = (config.columns ?? []).map((column) => ({

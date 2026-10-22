@@ -22,7 +22,7 @@ function closeActive() {
  * @param {object} options `{ x, y }` 视口坐标。
  * @returns {{ destroy: () => void }}
  */
-export function openMenu(items, { x, y } = {}) {
+function openMenu(items, { x, y } = {}) {
   closeActive();
 
   const menu = document.createElement("div");
@@ -109,6 +109,6 @@ export function openMenu(items, { x, y } = {}) {
   return controller;
 }
 
-export function closeMenu() {
+function closeMenu() {
   closeActive();
 }

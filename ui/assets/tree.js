@@ -1,4 +1,3 @@
-import { createIcon, iconForKind } from "./icons.js";
 
 /**
  * 对象树。
@@ -10,7 +9,7 @@ import { createIcon, iconForKind } from "./icons.js";
  * 层级深度不固定 —— PostgreSQL 是连接 → database → schema → 表 三层,
  * Redis 是连接 → 编号库 → 类型分组 两层,SQLite 更浅。渲染是递归的。
  */
-export class TreeView {
+class TreeView {
   constructor({ onSelect, onContextMenu } = {}) {
     this.onSelect = onSelect ?? (() => {});
     this.onContextMenu = onContextMenu ?? (() => {});

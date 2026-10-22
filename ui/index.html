@@ -8,70 +8,50 @@
       content="SelaDB UI 设计源:跨平台数据库管理工具的 HTML + CSS + JS 视觉与交互基线。"
     />
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/assets/tokens.css" />
-    <link rel="stylesheet" href="/assets/styles.css" />
-    <link rel="stylesheet" href="/assets/pages.css" />
+    <link rel="stylesheet" href="./assets/tokens.css" />
+    <link rel="stylesheet" href="./assets/styles.css" />
+    <link rel="stylesheet" href="./assets/pages.css" />
     <title>SelaDB Design Source</title>
-    <script>
-      // file:// 下浏览器会用 CORS 规则拦住模块脚本去加载外部 .js,
-      // 表现是「页面一片空白」。这里提前拦一道,给出能真正打开的入口,
-      // 而不是让人以为设计源坏了。
-      //
-      // 注意这段必须是普通脚本:模块脚本在 file:// 下根本不会执行。
-      (function () {
-        if (location.protocol !== "file:") return;
-
-        document.addEventListener("DOMContentLoaded", function () {
-          // main.js 启动时会置位这个标志。没置位说明模块脚本被 CORS 拦下了,
-          // 页面确实没渲染出来 —— 这时才提示。
-          // 单文件产物在 file:// 下能正常跑,标志会置位,不会误报。
-          if (window.__seladbBooted) return;
-
-          var root = document.getElementById("app");
-          if (!root) return;
-
-          var box = document.createElement("div");
-          box.style.cssText =
-            "height:100vh;display:flex;flex-direction:column;align-items:center;" +
-            "justify-content:center;gap:16px;font:14px/1.6 -apple-system," +
-            "BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;" +
-            "color:#1c2230;background:#f2f4f7;padding:32px;text-align:center";
-
-          var title = document.createElement("div");
-          title.style.cssText = "font-size:20px;font-weight:600";
-          title.textContent = "这个页面需要通过 HTTP 打开";
-          box.appendChild(title);
-
-          var desc = document.createElement("div");
-          desc.style.cssText = "color:#5f6b7d;max-width:520px";
-          desc.textContent =
-            "设计源用的是 ES 模块,浏览器在 file:// 协议下会用 CORS 规则拦住它," +
-            "所以直接双击 index.html 会是空白页。两个办法:";
-          box.appendChild(desc);
-
-          var list = document.createElement("ol");
-          list.style.cssText =
-            "text-align:left;color:#5f6b7d;max-width:520px;margin:0;padding-left:24px";
-          [
-            "开发预览:在 ui/ 目录下跑 bun run dev,然后打开 http://127.0.0.1:8030",
-            "单文件预览:跑 bun run build,双击 ui/dist/SelaDB-UI-Preview.html(无需服务器)",
-          ].forEach(function (text) {
-            var item = document.createElement("li");
-            item.style.margin = "6px 0";
-            item.textContent = text;
-            list.appendChild(item);
-          });
-          box.appendChild(list);
-
-          root.replaceChildren(box);
-        });
-      })();
-    </script>
   </head>
   <body data-theme="light" data-density="comfortable">
     <div id="app" class="app-root">
       <noscript>该设计源需要启用 JavaScript 才能运行。</noscript>
     </div>
-    <script type="module" src="/assets/main.js"></script>
+
+    <!--
+      纯静态:没有构建步骤,没有依赖,双击 index.html 就能打开。
+      所以不能用 ES module —— 浏览器在 file:// 协议下会用 CORS 规则拦住
+      模块脚本去加载外部 .js,表现是整页空白。普通 <script> 没有这个限制。
+
+      加载顺序按依赖排:
+        icons        ← 基础图标
+        ui-kit       ← 弹层/抽屉/Toast/表单控件,依赖 icons
+        menu         ← 菜单
+        tree         ← 依赖 icons
+        datagrid     ← 依赖 menu、ui-kit
+        document-tree← 依赖 icons、ui-kit
+        query-editor ← 词法着色
+        structure-view← 依赖 icons、query-editor
+        command-palette← 依赖 icons
+        value-editor ← 依赖 icons
+        mock-data    ← 假数据
+        mock-sql     ← 假执行器
+        app          ← 装配,依赖上面全部
+        main         ← 启动
+    -->
+    <script src="./assets/icons.js"></script>
+    <script src="./assets/ui-kit.js"></script>
+    <script src="./assets/menu.js"></script>
+    <script src="./assets/tree.js"></script>
+    <script src="./assets/datagrid.js"></script>
+    <script src="./assets/document-tree.js"></script>
+    <script src="./assets/query-editor.js"></script>
+    <script src="./assets/structure-view.js"></script>
+    <script src="./assets/command-palette.js"></script>
+    <script src="./assets/value-editor.js"></script>
+    <script src="./assets/mock-data.js"></script>
+    <script src="./assets/mock-sql.js"></script>
+    <script src="./assets/app.js"></script>
+    <script src="./assets/main.js"></script>
   </body>
 </html>

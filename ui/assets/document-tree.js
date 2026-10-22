@@ -17,7 +17,6 @@
  * 这一种输入。
  */
 
-import { createIcon } from "./icons.js";
 
 /**
  * 默认展开深度(0 = 文档的直接子字段)。
@@ -34,7 +33,7 @@ const DEFAULT_OPEN_DEPTH = 1;
  */
 const OPEN_CLASS = "is-open";
 
-export class DocumentTree {
+class DocumentTree {
   /**
    * @param {Array<object>} documents BSON 文档数组
    */
@@ -398,26 +397,3 @@ async function copyJson(doc) {
   console.info(ok ? "已复制文档 JSON" : "复制文档 JSON 失败", doc?._id);
 }
 
-async function copyText(text) {
-  try {
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // 剪贴板不可用(非安全上下文 / 权限被拒),退回老办法
-  }
-  try {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand("copy");
-    area.remove();
-    return ok;
-  } catch {
-    return false;
-  }
-}

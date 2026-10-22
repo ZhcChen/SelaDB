@@ -34,7 +34,7 @@ const MOCK_ELAPSED = [8, 12, 23, 5, 31];
  * @param {string} sql
  * @returns {Array<{ text: string, offset: number, line: number }>}
  */
-export function splitStatements(sql) {
+function splitStatements(sql) {
   const source = sql ?? "";
   const statements = [];
   let start = 0;
@@ -111,7 +111,7 @@ function isBlank(text) {
  *
  * @returns {Array<{ name: string, start: number, end: number }>}
  */
-export function findTableRefs(statement) {
+function findTableRefs(statement) {
   const refs = [];
   const pattern =
     /\b(?:from|join|into|update)\s+("(?:[^"]+)"|`[^`]+`|[A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)*)/gi;
@@ -132,7 +132,7 @@ export function findTableRefs(statement) {
 }
 
 /** 判断语句类型。 */
-export function statementKind(statement) {
+function statementKind(statement) {
   const head = statement.replace(/--[^\n]*/g, "").trimStart().toLowerCase();
   for (const [keyword, kind] of STATEMENT_KINDS) {
     if (head.startsWith(keyword)) return kind;
@@ -147,7 +147,7 @@ export function statementKind(statement) {
  * @param {object} options `{ tables: Map<string, {columns, rows, total}> }`
  * @returns {{ ok: boolean, statements: Array, results: Array, error: object|null, elapsedMs: number }}
  */
-export function executeQuery(sql, { tables }) {
+function executeQuery(sql, { tables }) {
   const statements = splitStatements(sql);
 
   if (statements.length === 0) {

@@ -1,4 +1,3 @@
-import { createIcon } from "./icons.js";
 
 /**
  * 命令面板(⌘K)。
@@ -16,7 +15,7 @@ import { createIcon } from "./icons.js";
  * @param {string} text
  * @returns {{ score: number, indices: number[] }|null}
  */
-export function fuzzyMatch(query, text) {
+function fuzzyMatch(query, text) {
   const q = (query ?? "").trim().toLowerCase();
   const t = (text ?? "").toLowerCase();
   if (!q) return { score: 0, indices: [] };
@@ -78,7 +77,7 @@ function highlight(text, indices) {
   return fragment;
 }
 
-export class CommandPalette {
+class CommandPalette {
   constructor({ commands = [], onSelect } = {}) {
     this.commands = commands;
     this.onSelect = onSelect ?? (() => {});

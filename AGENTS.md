@@ -48,8 +48,10 @@ docs/                   架构文档与 ADR
 `ui/` 是**纯静态**的 HTML + CSS + JS 设计源，不进 Cargo 工作区，是后续 Rust 原生实现的视觉与交互基线。
 
 - **零第三方 UI 依赖**：数据网格、对象树、菜单、图标全部自研，视觉完全由 `ui/assets/tokens.css` 控制。
+- **零构建步骤**：纯静态 HTML + CSS + JS，**双击 `ui/index.html` 就能打开**，不占端口、不需要服务器。
+- 因为不用 ES module（`file://` 下会被 CORS 拦住），所有脚本共享全局作用域，**`ui/assets/` 里的顶层名字必须全局唯一**。
 - `tokens.css` 是唯一设计源，组件样式里不出现裸色值与裸尺寸。
-- 改动设计源后跑 `cd ui && bun run test:smoke`（需先 `bun run dev`），截图落在 `ui/tests/screenshots/` 作为视觉回归基准。
+- 改动设计源后跑 `cd ui && bun run test:smoke`（直接跑 `file://` 协议，不需要先起服务器），截图落在 `ui/tests/screenshots/` 作为视觉回归基准。
 - 详见 [`ui/README.md`](ui/README.md) 与 [`docs/ui-design-plan.md`](docs/ui-design-plan.md)。
 
 ## 加新引擎时

@@ -41,7 +41,7 @@ function escapeHtml(text) {
  * @param {string} source
  * @returns {Array<{ type: string, text: string, start: number, end: number }>}
  */
-export function tokenizeSql(source) {
+function tokenizeSql(source) {
   const tokens = [];
   const n = source.length;
   let i = 0;
@@ -127,7 +127,7 @@ export function tokenizeSql(source) {
  * @param {string} source
  * @param {{ start: number, end: number }|null} errorRange 出错区间,落在区间内的 token 会加错误样式
  */
-export function highlightSql(source, errorRange = null) {
+function highlightSql(source, errorRange = null) {
   const tokens = tokenizeSql(source);
   let html = "";
 
@@ -146,7 +146,7 @@ export function highlightSql(source, errorRange = null) {
   return `${html}\n`;
 }
 
-export class QueryEditor {
+class QueryEditor {
   constructor({ value = "", onExecute, onChange } = {}) {
     this.value = value;
     this.onExecute = onExecute ?? (() => {});

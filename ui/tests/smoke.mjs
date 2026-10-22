@@ -13,12 +13,16 @@
 
 import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { chromium } from "playwright";
 
-const BASE = process.env.SELA_DB_UI_URL ?? "http://127.0.0.1:8030";
 const here = dirname(fileURLToPath(import.meta.url));
 const shotDir = join(here, "screenshots");
+
+// 默认直接跑 file:// —— 设计源是纯静态的,验收不该要求先起服务器。
+// 需要对着 dev server 跑时用 SELA_DB_UI_URL 覆盖。
+const BASE =
+  process.env.SELA_DB_UI_URL ?? `file://${resolve(here, "..", "index.html")}`;
 
 const results = [];
 let failures = 0;
@@ -47,7 +51,7 @@ await mkdir(shotDir, { recursive: true });
 
 // ---- 工作台 ----
 console.log("\n[1] 主工作台");
-await page.goto(`${BASE}/#/design`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}#/design`, { waitUntil: "networkidle" });
 await page.waitForSelector(".tree__node", { timeout: 10000 });
 
 const connectionNodes = await page.locator(".tree__node[data-kind='connection']").count();
@@ -374,7 +378,7 @@ await page.waitForTimeout(200);
 
 // ---- 连接向导 ----
 console.log("\n[12] 连接向导");
-await page.goto(`${BASE}/#/connect`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}#/connect`, { waitUntil: "networkidle" });
 await page.waitForSelector(".engine-card", { timeout: 5000 });
 check("向导第一步列出六种引擎", (await page.locator(".engine-card").count()) === 6);
 
@@ -390,12 +394,12 @@ await shot(page, "15-connect");
 // ---- 其他路由 ----
 console.log("\n[13] 路由");
 for (const [route, selector] of [
-  ["#/entry", ".entry__card"],
-  ["#/spec", ".swatches"],
-  ["#/connect", ".engine-card"],
-  ["#/settings", ".setting-row"],
+  ["/entry", ".entry__card"],
+  ["/spec", ".swatches"],
+  ["/connect", ".engine-card"],
+  ["/settings", ".setting-row"],
 ]) {
-  await page.goto(`${BASE}/${route}`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}#${route}`, { waitUntil: "networkidle" });
   const count = await page.locator(selector).count();
   check(`${route} 渲染正常`, count > 0, `命中 ${count}`);
 }
@@ -403,11 +407,11 @@ for (const [route, selector] of [
 // 恢复默认偏好(浅色、舒适密度)再拍规范页
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: "networkidle" });
-await page.goto(`${BASE}/#/spec`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}#/spec`, { waitUntil: "networkidle" });
 await page.waitForSelector(".swatches", { timeout: 5000 });
 await shot(page, "05-spec");
 
-await page.goto(`${BASE}/#/entry`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}#/entry`, { waitUntil: "networkidle" });
 await page.waitForSelector(".entry__card", { timeout: 5000 });
 await shot(page, "06-entry");
 

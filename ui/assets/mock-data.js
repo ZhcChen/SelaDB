@@ -11,7 +11,7 @@
  */
 
 /** 六种引擎的元数据 */
-export const ENGINES = {
+const ENGINES = {
   postgresql: { id: 'postgresql', label: 'PostgreSQL', color: '#336791', defaultPort: 5432, group: '关系型', driver: 'PostgreSQL' },
   mysql: { id: 'mysql', label: 'MySQL / MariaDB', color: '#00758f', defaultPort: 3306, group: '关系型', driver: 'MySQL' },
   sqlite: { id: 'sqlite', label: 'SQLite', color: '#3b7ea1', defaultPort: 0, group: '关系型', driver: 'SQLite' },
@@ -29,7 +29,7 @@ export const ENGINES = {
  * - MongoDB:   连接 → database → 集合/索引
  * - Redis:     连接 → 编号库 → 按类型分组 → 键
  */
-export const CONNECTIONS = [
+const CONNECTIONS = [
   {
     id: 'pg-local',
     engine: 'postgresql',
@@ -263,7 +263,7 @@ export const CONNECTIONS = [
 ];
 
 /** 关系型引擎的表数据,键为树节点的 dataKey */
-export const TABLE_DATA = {
+const TABLE_DATA = {
   'pg-local/postgres/public/users': {
     columns: [
       { key: 'id', name: 'id', type: 'integer', pk: true, nullable: false },
@@ -699,7 +699,7 @@ export const TABLE_DATA = {
 };
 
 /** MongoDB 的文档数据,键为树节点的 dataKey */
-export const DOCUMENTS = {
+const DOCUMENTS = {
   'mongo-local/shop/users': [
     {
       _id: '665f1a2b3c4d5e6f7a8b9c0d',
@@ -1000,7 +1000,7 @@ export const DOCUMENTS = {
 };
 
 /** Redis 的键列表,键为树节点的 dataKey */
-export const KEYS = {
+const KEYS = {
   'redis-local/db0': [
     { key: 'cache:user:1001', type: 'string', ttl: 300, size: 128, value: '{"name":"伟","tier":"gold"}' },
     { key: 'cache:order:SO-2025-000123', type: 'string', ttl: 600, size: 512, value: '{"status":"paid","amount":1160.5,"currency":"CNY"}' },
@@ -1029,7 +1029,7 @@ export const KEYS = {
 };
 
 /** 界面文案与引擎分组信息 */
-export const UI_COPY = {
+const UI_COPY = {
   appName: 'SelaDB',
   // 对象类型的显示名与图标 key
   objectKinds: {
@@ -1292,7 +1292,7 @@ function engineOf(dataKey) {
   return connection?.engine ?? "postgresql";
 }
 
-export const TABLE_STRUCTURE = Object.fromEntries(
+const TABLE_STRUCTURE = Object.fromEntries(
   Object.entries(TABLE_DATA).map(([dataKey, data]) => [
     dataKey,
     buildStructure(dataKey, data, engineOf(dataKey)),
@@ -1305,7 +1305,7 @@ export const TABLE_STRUCTURE = Object.fromEntries(
  * 目标是「看起来就是那个引擎导出来的」:PostgreSQL 用 schema 限定名、
  * 独立的外键 ALTER 语句;MySQL 用反引号、KEY 索引、ENGINE 尾巴。
  */
-export function generateDdl(dataKey) {
+function generateDdl(dataKey) {
   const structure = TABLE_STRUCTURE[dataKey];
   if (!structure) return "";
   const engine = engineOf(dataKey);

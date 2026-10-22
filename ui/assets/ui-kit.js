@@ -1,4 +1,3 @@
-import { createIcon } from "./icons.js";
 
 /**
  * UI 原语:弹层、抽屉、Toast、表单控件。
@@ -28,7 +27,7 @@ let activeOverlay = null;
  *   - `danger` 确认按钮是否为危险操作
  * @returns {Promise<object|null>} 确认时返回字段值对象,取消返回 null
  */
-export function openDialog(options = {}) {
+function openDialog(options = {}) {
   const {
     title = "确认",
     message = "",
@@ -154,7 +153,7 @@ function closeOverlay() {
  * @param {object} options `{ title, content, width, onClose }`
  * @returns {{ element: HTMLElement, close: () => void }}
  */
-export function openDrawer({ title = "", content = null, width = 420, onClose } = {}) {
+function openDrawer({ title = "", content = null, width = 420, onClose } = {}) {
   const overlay = document.createElement("div");
   overlay.className = "drawer__overlay";
 
@@ -219,7 +218,7 @@ let toastStack = null;
  * @param {string} message
  * @param {object} options `{ type, duration }` type ∈ success | error | info | warning
  */
-export function toast(message, { type = "info", duration = 2600 } = {}) {
+function toast(message, { type = "info", duration = 2600 } = {}) {
   if (!toastStack) {
     toastStack = document.createElement("div");
     toastStack.className = "toast-stack";
@@ -251,6 +250,36 @@ export function toast(message, { type = "info", duration = 2600 } = {}) {
   return item;
 }
 
+/**
+ * 复制到剪贴板。
+ *
+ * 非安全上下文(file:// 或 http)下 clipboard API 不可用,退回 execCommand。
+ * 设计源要在 file:// 下能直接跑,所以这个兜底是必需的,不是可选优化。
+ */
+async function copyText(text) {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // 剪贴板不可用(非安全上下文 / 权限被拒),退回老办法
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 /* -----------------------------------------------------------------------------
  * 表单控件
  *
@@ -264,7 +293,7 @@ export function toast(message, { type = "info", duration = 2600 } = {}) {
  * @param {object} field
  * @returns {{ element: HTMLElement, name: string, read: () => any }}
  */
-export function createField(field) {
+function createField(field) {
   const wrapper = document.createElement("div");
   wrapper.className = `field${field.full ? " field--full" : ""}`;
 

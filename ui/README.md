@@ -11,17 +11,25 @@
 - 不依赖真实 API,全部用 mock 数据演示流程。
 - 零第三方 UI 依赖:数据网格、对象树、菜单、图标全部自研,视觉完全由
   `assets/tokens.css` 控制。
-- 纯静态产物,Vite 只承担开发期 HMR 与生产构建。
+- **零构建步骤**:纯静态 HTML + CSS + JS,双击即开,不占端口。
 - 与后续 Rust 实现共用同一套设计语义(token 命名、数据类型色、引擎树规格),
   避免设计源与实现分叉。
+
+## 怎么打开
+
+**双击 `ui/index.html` 就能看。** 没有构建步骤、没有运行时依赖、不占端口。
+
+设计源刻意不用 ES module:浏览器在 `file://` 协议下会用 CORS 规则拦住模块脚本
+去加载外部 `.js`,整页就白了。改用普通 `<script>` 按依赖顺序加载,`file://` 与
+`http://` 下行为完全一致。代价是所有脚本共享全局作用域,所以顶层名字必须全局
+唯一 —— 这是 `ui/assets/` 里的硬约束。
 
 ## 目录
 
 ```text
 ui/
-├── index.html            # 入口
-├── package.json
-├── vite.config.js
+├── index.html            # 入口(普通 <script>,按依赖顺序加载 assets/)
+├── package.json          # 只为冒烟验收准备,查看设计源不需要它
 ├── assets/
 │   ├── tokens.css        # 唯一设计源:颜色/间距/字号/圆角/阴影/动效
 │   ├── styles.css        # 组件样式:外壳、树、Tab 栏、数据网格、菜单
@@ -44,29 +52,20 @@ ui/
     └── page-map.md       # 路由地图
 ```
 
-## 运行
+## 改动与验收
+
+改完刷新浏览器即可,没有热更新也没有打包。
 
 ```bash
 cd ui
-bun install          # vite + playwright 两个开发依赖
-bun run dev          # http://127.0.0.1:8030
-bun run build        # 产物在 dist/,含一个单文件预览版
-bun run test:smoke   # 冒烟验收,需要 dev server 已经起来
+bun install       # 只装 playwright 一个开发依赖
+bun run test:smoke
 ```
 
-### 怎么打开
+验收直接跑 `file://` 协议,不需要起服务器 —— 断言的就是「双击能不能用」。
+截图落在 `tests/screenshots/`,作为视觉回归基准。
 
-**直接双击 `ui/index.html` 会是空白页** —— 设计源用的是 ES 模块,浏览器在
-`file://` 协议下会用 CORS 规则拦住它加载外部 `.js`。源文件里已经放了提示,
-会告诉你下面两条路怎么走。
-
-| 方式 | 命令 | 产物 |
-|---|---|---|
-| 开发预览 | `bun run dev` → http://127.0.0.1:8030 | 改代码即刷新,支持 HMR |
-| 单文件预览 | `bun run build` → 双击 `ui/dist/SelaDB-UI-Preview.html` | 单个 232 KB 的 HTML,拷给谁都能直接打开,不需要服务器 |
-
-`bun run build` 会在 Vite 产物之后再跑一次内联(`scripts/inline.mjs`),把 CSS 与
-JS 全部塞进 HTML 里 —— 这是为了绕开上面说的 CORS 限制。
+要对着 dev server 跑时用 `SELA_DB_UI_URL=http://127.0.0.1:8030 bun run test:smoke`。
 
 ## 设计决策
 

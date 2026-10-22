@@ -1,4 +1,3 @@
-import { boot } from "./app.js";
 
 /**
  * 设计源入口。

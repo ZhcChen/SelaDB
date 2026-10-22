@@ -1,24 +1,3 @@
-import {
-  CONNECTIONS,
-  DOCUMENTS,
-  ENGINES,
-  KEYS,
-  TABLE_DATA,
-  TABLE_STRUCTURE,
-  UI_COPY,
-  generateDdl,
-} from "./mock-data.js";
-import { DataGrid } from "./datagrid.js";
-import { DocumentTree } from "./document-tree.js";
-import { StructureView } from "./structure-view.js";
-import { TreeView } from "./tree.js";
-import { CommandPalette } from "./command-palette.js";
-import { QueryEditor } from "./query-editor.js";
-import { ValueEditor } from "./value-editor.js";
-import { executeQuery, splitStatements } from "./mock-sql.js";
-import { createIcon, iconForKind } from "./icons.js";
-import { openMenu } from "./menu.js";
-import { createField, openDialog, openDrawer, toast } from "./ui-kit.js";
 
 /* =============================================================================
  * SelaDB 设计源 —— 外壳装配
@@ -774,27 +753,6 @@ async function confirmDeleteNode(node) {
 }
 
 /** 复制到剪贴板,非安全上下文下退回老办法。 */
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch {
-      ok = false;
-    }
-    area.remove();
-    return ok;
-  }
-}
 
 /* -----------------------------------------------------------------------------
  * 7. 对象树面板
@@ -2152,7 +2110,7 @@ function renderRoute(root) {
 /* -----------------------------------------------------------------------------
  * 15. 启动
  * -------------------------------------------------------------------------- */
-export function boot(root) {
+function boot(root) {
   restorePreferences();
   buildNodeIndex();
 

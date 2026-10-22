@@ -80,7 +80,7 @@ const ICON_PATHS = {
  * @param {number} size 像素边长,默认 16
  * @returns {SVGElement}
  */
-export function createIcon(name, size = 16) {
+function createIcon(name, size = 16) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 16 16");
   svg.setAttribute("width", String(size));
@@ -103,7 +103,7 @@ export function createIcon(name, size = 16) {
 }
 
 /** 对象类型 kind 对应的图标名。与 mock-data.js 的 UI_COPY.objectKinds 保持一致。 */
-export const KIND_ICONS = {
+const KIND_ICONS = {
   connection: "connection",
   database: "database",
   schema: "schema",
@@ -120,6 +120,6 @@ export const KIND_ICONS = {
   keygroup: "keygroup",
 };
 
-export function iconForKind(kind, fallback = "dot") {
+function iconForKind(kind, fallback = "dot") {
   return KIND_ICONS[kind] ?? fallback;
 }

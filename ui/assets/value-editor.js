@@ -9,7 +9,6 @@
  * 这里只把「改一个值要经过哪些界面元素」定下来。
  */
 
-import { createIcon } from "./icons.js";
 
 const TYPE_LABEL = {
   string: "字符串",
@@ -27,7 +26,7 @@ const TYPE_ICON = {
   zset: "function",
 };
 
-export class ValueEditor {
+class ValueEditor {
   /**
    * @param {object} entry 形如 `{ key, type, ttl, size, value?, fields?, values?, entries? }`
    */
@@ -158,7 +157,7 @@ export class ValueEditor {
 
     const head = document.createElement("div");
     head.className = "value-editor__tr value-editor__tr--head";
-    head.appendChild(cell("字段"), cell("值"), cell(""));
+    head.appendChild(kvCell("字段"), kvCell("值"), kvCell(""));
     table.appendChild(head);
 
     const fields = this.entry.fields ?? {};
@@ -224,7 +223,7 @@ export class ValueEditor {
 
     const head = document.createElement("div");
     head.className = "value-editor__tr value-editor__tr--head";
-    head.appendChild(cell("成员"), cell("分数"), cell(""));
+    head.appendChild(kvCell("成员"), kvCell("分数"), kvCell(""));
     table.appendChild(head);
 
     for (const entry of this.entry.entries ?? []) {
@@ -263,7 +262,7 @@ export class ValueEditor {
   }
 }
 
-function cell(text) {
+function kvCell(text) {
   const el = document.createElement("div");
   el.className = "value-editor__cell";
   el.textContent = text;
