@@ -214,6 +214,8 @@ export class DataGrid {
     this.frame = null;
 
     this.onSortChange = config.onSortChange ?? (() => {});
+    /** 行点击回调,参数是源行下标(过滤排序之后的下标没意义) */
+    this.onRowClick = config.onRowClick ?? (() => {});
     this.onFilterChange = config.onFilterChange ?? (() => {});
     this.onCellChange = config.onCellChange ?? (() => {});
     this.onSelectionChange = config.onSelectionChange ?? (() => {});
@@ -602,6 +604,8 @@ export class DataGrid {
         this.onSelectionChange(this.getSelected());
       }
       this.#syncSelectionClasses();
+      const sourceIndex = this.view[index];
+      if (sourceIndex !== undefined) this.onRowClick(sourceIndex, event);
     });
 
     return row;

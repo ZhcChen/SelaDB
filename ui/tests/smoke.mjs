@@ -305,8 +305,90 @@ await page.evaluate(() => {
   localStorage.clear();
 });
 
+// ---- 表结构视图 ----
+console.log("\n[9] 表结构视图");
+await page.locator(".tree__node[data-id='pg-local']").click();
+await page.locator(".tree__node[data-id='pg-local/postgres']").click();
+await page.locator(".tree__node[data-id='pg-local/postgres/public']").click();
+await page.locator(".tree__node[data-id='pg-local/postgres/public/users']").click();
+await page.waitForSelector(".panel__head .segmented__item", { timeout: 5000 });
+
+const modes = await page.locator(".panel__head .segmented__item").allTextContents();
+check("表 Tab 有数据/结构/DDL 三态", modes.length === 3, modes.join(" / "));
+
+await page.locator(".panel__head .segmented__item", { hasText: "结构" }).click();
+await page.waitForTimeout(250);
+const subtabs = await page.locator(".subtab").allTextContents();
+check("结构视图有四个分面", subtabs.length === 4, subtabs.join(" / "));
+
+const structRows = await page.locator(".struct-panel:not([hidden]) .struct-table tbody tr").count();
+check("列出列定义", structRows > 0, `${structRows} 行`);
+
+const pkBadges = await page.locator(".struct-key--pk").count();
+check("主键有标识", pkBadges > 0, `${pkBadges} 处`);
+
+await shot(page, "11-structure");
+
+// DDL
+await page.locator(".panel__head .segmented__item", { hasText: "DDL" }).click();
+await page.waitForTimeout(250);
+const ddlText = (await page.locator(".struct-ddl__code").textContent()) ?? "";
+check("DDL 预览有内容", ddlText.includes("CREATE TABLE"), ddlText.split("\n")[0]);
+check("DDL 带语法着色", (await page.locator(".struct-ddl__code .tok-keyword").count()) > 0);
+const ddlBadge = await page.locator(".struct-ddl__head .engine-badge").textContent();
+check("DDL 标出引擎方言", (ddlBadge ?? "").includes("PostgreSQL"), ddlBadge?.trim());
+await shot(page, "12-ddl");
+
+// ---- 右键菜单与确认框 ----
+console.log("\n[10] 右键菜单与确认框");
+await page.locator(".panel__head .segmented__item", { hasText: "数据" }).click();
+await page.locator(".tree__node[data-id='pg-local/postgres/public/orders']").click({ button: "right" });
+await page.waitForSelector(".menu", { timeout: 3000 });
+
+const menuLabels = await page.locator(".menu__item").allTextContents();
+check("菜单有打开数据/结构/DDL", ["打开数据", "查看结构", "生成 DDL"].every((l) => menuLabels.includes(l)), menuLabels.join(" / "));
+check("菜单项不重复", new Set(menuLabels).size === menuLabels.length, menuLabels.join(" / "));
+await shot(page, "13-context-menu");
+
+await page.locator(".menu__item", { hasText: "删除表" }).click();
+await page.waitForSelector(".dialog", { timeout: 3000 });
+const dialogText = (await page.locator(".dialog__message").textContent()) ?? "";
+check("删除走确认框", dialogText.includes("orders"), dialogText.trim().slice(0, 40));
+await page.locator(".dialog__foot .btn--danger").click();
+await page.waitForTimeout(300);
+check("确认后有 Toast 反馈", (await page.locator(".toast").count()) > 0);
+
+// ---- Redis 值编辑器 ----
+console.log("\n[11] Redis 值编辑器");
+await page.locator(".tree__node[data-id='redis-local']").click();
+await page.locator(".tree__node[data-id='redis-local/db0']").click();
+await page.waitForSelector(".grid__row--body", { timeout: 5000 });
+await page.locator(".grid__row--body").first().click();
+await page.waitForSelector(".value-editor", { timeout: 3000 });
+check("点键打开值编辑器", (await page.locator(".value-editor").count()) === 1);
+const typeLabel = (await page.locator(".value-editor__type").textContent()) ?? "";
+check("值编辑器标出类型", typeLabel.length > 0, typeLabel.trim());
+await shot(page, "14-value-editor");
+await page.keyboard.press("Escape");
+await page.waitForTimeout(200);
+
+// ---- 连接向导 ----
+console.log("\n[12] 连接向导");
+await page.goto(`${BASE}/#/connect`, { waitUntil: "networkidle" });
+await page.waitForSelector(".engine-card", { timeout: 5000 });
+check("向导第一步列出六种引擎", (await page.locator(".engine-card").count()) === 6);
+
+await page.locator(".engine-card").first().click();
+await page.locator(".btn--primary", { hasText: "下一步" }).click();
+await page.waitForSelector(".field", { timeout: 3000 });
+const fieldCount = await page.locator(".field").count();
+check("第二步是参数表单", fieldCount > 0, `${fieldCount} 个字段`);
+check("表单含密码输入", (await page.locator('input[type="password"]').count()) > 0);
+check("表单含开关控件", (await page.locator(".switch__input").count()) > 0);
+await shot(page, "15-connect");
+
 // ---- 其他路由 ----
-console.log("\n[9] 路由");
+console.log("\n[13] 路由");
 for (const [route, selector] of [
   ["#/entry", ".entry__card"],
   ["#/spec", ".swatches"],
@@ -330,7 +412,7 @@ await page.waitForSelector(".entry__card", { timeout: 5000 });
 await shot(page, "06-entry");
 
 // ---- 控制台 ----
-console.log("\n[10] 控制台");
+console.log("\n[14] 控制台");
 check("无控制台错误", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
 await browser.close();

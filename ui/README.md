@@ -31,10 +31,13 @@ ui/
 │   ├── tree.js           # 对象树(任意深度,配置驱动)
 │   ├── datagrid.js       # 数据网格(纯原生自研)
 │   ├── document-tree.js  # MongoDB 文档折叠树
+│   ├── structure-view.js # 表结构视图(列/索引/约束/外键 + DDL)
 │   ├── query-editor.js   # SQL 查询编辑器(语法高亮)
 │   ├── command-palette.js# 命令面板(⌘K)
+│   ├── value-editor.js   # Redis 键值编辑器(按类型渲染)
+│   ├── ui-kit.js         # UI 原语:弹层、抽屉、Toast、表单控件
 │   ├── mock-sql.js       # 假 SQL 执行器(会真的报错并给位置)
-│   ├── mock-data.js      # 六引擎假数据
+│   ├── mock-data.js      # 六引擎假数据 + 表结构 + DDL 生成
 │   ├── app.js            # 外壳装配、路由、数据视图抽象
 │   └── main.js           # 启动入口
 └── docs/
@@ -69,9 +72,25 @@ bun run test:smoke   # 冒烟验收,需要 dev server 已经起来
 
 ## 组件分级
 
-- **P0**:DataGrid、TreeView、TabBar、Toolbar/StatusBar、Splitter、Dialog/Modal
-- **P1**:QueryEditor、CommandPalette、表单控件组、Icon 系统
-- **P2**:DocumentTree/JsonViewer(MongoDB)、KeyValueList/ValueEditor(Redis)
+- **P0**:DataGrid、TreeView、TabBar、Toolbar/StatusBar、Splitter、Dialog/Modal/Drawer
+- **P1**:QueryEditor、CommandPalette、表单控件组、Toast、Icon 系统
+- **P2**:DocumentTree(MongoDB)、KeyValueList/ValueEditor(Redis)
+
+唯一没做的是 `DiffViewer`(结构变更对比)—— 它依赖真实的 schema 版本历史,
+设计源里造不出有说服力的样例,理由见 `docs/ui-design-plan.md` §10。
+
+## 职责边界
+
+这个设计源是**基线,不是需求文档**。它负责把「看起来什么样」和「状态怎么流转」
+定死;功能完备性、真实数据、边界情况、性能归 Rust 实现侧。
+
+改 Rust 实现时要不要回头改设计源:
+
+- 改的是**视觉** → 改设计源,截图基线跟着更新
+- 改的是**行为细节或边界情况** → 只改 Rust 实现
+- 改的是**交互模型本身** → 两边都改
+
+判断不清时先假设是第二种。
 
 ## 三条“真能用”的交互
 
@@ -86,6 +105,9 @@ bun run test:smoke   # 冒烟验收,需要 dev server 已经起来
    Rust 侧要用 `tree-sitter-sql`,但**视觉契约以这里为准**。
 3. **命令面板**把命令和对象放在一起模糊检索。对象树可能有几百个节点,
    让用户先展开三层再找一张表不现实,直接搜表名更快。
+4. **表结构与 DDL**是真生成的:列定义从数据派生,DDL 按引擎方言生成
+   (PostgreSQL 用 schema 限定名 + 独立的外键 ALTER,MySQL 用反引号 + ENGINE 尾巴),
+   所以 Rust 侧照着实现出来的就是同一个样子。
 
 ## 数据视图抽象
 

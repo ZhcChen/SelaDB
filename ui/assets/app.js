@@ -4,16 +4,21 @@ import {
   ENGINES,
   KEYS,
   TABLE_DATA,
+  TABLE_STRUCTURE,
   UI_COPY,
+  generateDdl,
 } from "./mock-data.js";
 import { DataGrid } from "./datagrid.js";
 import { DocumentTree } from "./document-tree.js";
+import { StructureView } from "./structure-view.js";
 import { TreeView } from "./tree.js";
 import { CommandPalette } from "./command-palette.js";
 import { QueryEditor } from "./query-editor.js";
+import { ValueEditor } from "./value-editor.js";
 import { executeQuery, splitStatements } from "./mock-sql.js";
 import { createIcon, iconForKind } from "./icons.js";
 import { openMenu } from "./menu.js";
+import { createField, openDialog, openDrawer, toast } from "./ui-kit.js";
 
 /* =============================================================================
  * SelaDB 设计源 —— 外壳装配
@@ -167,29 +172,107 @@ class TableDataView extends DataView {
       return;
     }
 
-    // 表的真实行数远大于设计源手写的那十几行,扩一批出来让虚拟滚动有东西可滚
-    const rows = expandRows(data.rows, data.columns, Math.min(data.total, 600));
+    this.data = data;
+    this.structure = TABLE_STRUCTURE[ctx.dataKey];
+    this.ddl = generateDdl(ctx.dataKey);
+    this.mode = ctx.mode ?? "data";
 
-    this.element.appendChild(buildPanelHead(ctx, `${rows.length} / ${data.total} 行`));
+    this.head = buildPanelHead(ctx, "");
+    this.element.appendChild(this.head);
+
+    // 数据 / 结构 / DDL 三种视图共用一个 Tab —— 拆成三个 Tab 会让标签栏爆掉,
+    // 而这本来就是同一张表的三个切面。
+    if (this.structure) {
+      const modes = document.createElement("div");
+      modes.className = "segmented";
+      for (const [key, label] of [
+        ["data", "数据"],
+        ["structure", "结构"],
+        ["ddl", "DDL"],
+      ]) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "segmented__item";
+        item.textContent = label;
+        item.dataset.mode = key;
+        item.addEventListener("click", () => this.setMode(key));
+        modes.appendChild(item);
+      }
+      this.head.appendChild(modes);
+      this.modes = modes;
+    }
 
     const body = document.createElement("div");
     body.className = "panel__body";
     this.element.appendChild(body);
+    this.body = body;
 
+    this.setMode(this.mode);
+  }
+
+  /** 切换数据/结构/DDL。 */
+  setMode(mode) {
+    this.mode = mode;
+    for (const item of this.modes?.querySelectorAll(".segmented__item") ?? []) {
+      item.classList.toggle("is-active", item.dataset.mode === mode);
+    }
+
+    this.grid?.destroy();
+    this.grid = null;
+    this.structureView?.destroy();
+    this.structureView = null;
+    this.body.replaceChildren();
+
+    if (mode === "structure" && this.structure) {
+      this.head.querySelector(".panel__sub:last-of-type")?.remove();
+      this.structureView = new StructureView({
+        structure: this.structure,
+        ddl: this.ddl,
+        engine: this.ctx.connection.engine,
+      });
+      this.structureView.mount(this.body);
+      this.setMeta(
+        `${this.structure.columns.length} 列 · ${this.structure.indexes.length} 索引 · ` +
+          `${this.structure.constraints.length} 约束 · ${this.structure.foreignKeys.length} 外键`,
+      );
+      return;
+    }
+
+    if (mode === "ddl" && this.ddl) {
+      this.structureView = new StructureView({
+        structure: this.structure,
+        ddl: this.ddl,
+        engine: this.ctx.connection.engine,
+      });
+      this.structureView.mountDdl(this.body);
+      this.setMeta("由设计源按结构生成");
+      return;
+    }
+
+    // 表的真实行数远大于设计源手写的那十几行,扩一批出来让虚拟滚动有东西可滚
+    const rows = expandRows(this.data.rows, this.data.columns, Math.min(this.data.total, 600));
     this.grid = new DataGrid({
-      columns: data.columns,
+      columns: this.data.columns,
       rows,
-      total: data.total,
+      total: this.data.total,
       onCellChange: (rowIndex, key, oldValue, newValue) => {
         // 设计源里只做提示,真实提交由 Rust 侧的 service 层负责
         console.info("单元格变更", { rowIndex, key, oldValue, newValue });
       },
     });
-    this.grid.mount(body);
+    this.grid.mount(this.body);
+    this.setMeta(`${rows.length} / ${this.data.total} 行`);
+  }
+
+  /** 更新面板头右侧的元信息。 */
+  setMeta(text) {
+    const meta = this.head.querySelector(".panel__meta");
+    if (meta) meta.textContent = text;
   }
 
   destroy() {
     this.grid?.destroy();
+    this.structureView?.destroy();
     super.destroy();
   }
 }
@@ -323,6 +406,7 @@ class KeyValueListView extends DataView {
         preview: previewValue(entry),
       })),
       total: keys.length,
+      onRowClick: (sourceIndex) => openValueEditor(keys[sourceIndex]),
     });
     this.grid.mount(body);
   }
@@ -392,7 +476,7 @@ function buildPanelHead(ctx, meta) {
   head.appendChild(spacer);
 
   const metaEl = document.createElement("div");
-  metaEl.className = "panel__sub";
+  metaEl.className = "panel__sub panel__meta";
   metaEl.textContent = meta;
   head.appendChild(metaEl);
 
@@ -601,6 +685,117 @@ function buildToolbar() {
   return bar;
 }
 
+/**
+ * 树节点右键菜单。
+ *
+ * 菜单项来自 mock 数据里每个节点声明的 actions,但真正的行为在这里定 ——
+ * 引擎差异不应该渗进菜单逻辑,菜单只认「这个节点是什么」。
+ */
+function buildNodeActions(node) {
+  const canOpen = Boolean(node.dataKey);
+  const isTable = node.kind === "table" || node.kind === "view";
+  const items = [];
+  const seen = new Set();
+
+  // mock 数据里每个节点都声明了自己的动作,菜单按声明顺序排,重复的只留一个
+  const push = (label, action, options = {}) => {
+    if (seen.has(label)) return;
+    seen.add(label);
+    items.push({ label, action, ...options });
+  };
+
+  if (canOpen) {
+    push("打开数据", () => openTabForNode(node, "data"), { icon: "table" });
+  }
+  if (isTable) {
+    push("查看结构", () => openTabForNode(node, "structure"), { icon: "schema" });
+    push("生成 DDL", () => openTabForNode(node, "ddl"), { icon: "copy" });
+  }
+
+  for (const label of node.actions ?? []) {
+    if (label === "复制名称") {
+      push(label, () => {
+        void copyText(node.label);
+        toast(`已复制「${node.label}」`, { type: "success" });
+      }, { shortcut: "⌘C" });
+      continue;
+    }
+    if (label.startsWith("删除")) {
+      push(label, () => confirmDeleteNode(node), { danger: true });
+      continue;
+    }
+    push(label, () => runNodeAction(label, node));
+  }
+
+  if (!seen.has("复制名称")) {
+    items.push({ type: "separator" });
+    push("复制名称", () => {
+      void copyText(node.label);
+      toast(`已复制「${node.label}」`, { type: "success" });
+    }, { shortcut: "⌘C" });
+  }
+
+  return items;
+}
+
+/** mock 数据里声明的动作。设计源只实现一部分,其余给个明确反馈。 */
+function runNodeAction(label, node) {
+  switch (label) {
+    case "刷新":
+      toast(`已刷新「${node.label}」`, { type: "success" });
+      return;
+    case "复制连接信息":
+      void copyText(node.label);
+      toast("已复制连接信息", { type: "success" });
+      return;
+    case "打开连接":
+    case "断开连接":
+      toast(label === "打开连接" ? "连接已就绪(mock)" : "连接已断开(mock)", { type: "info" });
+      return;
+    case "编辑连接":
+      location.hash = "#/connect";
+      return;
+    default:
+      toast(`「${label}」在设计源里还没有实现`, { type: "warning" });
+  }
+}
+
+/** 删除确认。破坏性操作必须走确认框,这是设计契约的一部分。 */
+async function confirmDeleteNode(node) {
+  const result = await openDialog({
+    title: `删除 ${node.label}`,
+    message: `确定要删除「${node.label}」吗?该操作不可撤销,表里的数据会一并丢失。`,
+    confirmText: "删除",
+    danger: true,
+  });
+  if (result) {
+    toast(`已删除「${node.label}」(mock)`, { type: "success" });
+  }
+}
+
+/** 复制到剪贴板,非安全上下文下退回老办法。 */
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    area.remove();
+    return ok;
+  }
+}
+
 /* -----------------------------------------------------------------------------
  * 7. 对象树面板
  * -------------------------------------------------------------------------- */
@@ -625,11 +820,7 @@ function buildTreePanel() {
       if (node?.dataKey) openTabForNode(node);
     },
     onContextMenu: (node, event) => {
-      const actions = node.actions ?? ["打开数据"];
-      openMenu(
-        actions.map((label) => ({ label, action: () => {} })),
-        { x: event.clientX, y: event.clientY },
-      );
+      openMenu(buildNodeActions(node), { x: event.clientX, y: event.clientY });
     },
   });
   tree.mount(treeHost);
@@ -665,12 +856,14 @@ function buildTabbar() {
   return bar;
 }
 
-function openTabForNode(node) {
+function openTabForNode(node, mode = "data") {
   const entry = state.nodeIndex.get(node.dataKey);
   if (!entry) return;
 
   const existing = state.tabs.find((tab) => tab.dataKey === node.dataKey);
   if (existing) {
+    // 同一个对象可能从不同入口打开(树里点数据、右键点结构),切模式即可
+    existing.mode = mode;
     state.activeTabId = existing.id;
     renderTabs();
     renderWorkspace();
@@ -684,6 +877,7 @@ function openTabForNode(node) {
     connection: entry.connection,
     title: node.label,
     kind: node.kind,
+    mode,
     dirty: false,
   };
   state.tabs.push(tab);
@@ -836,6 +1030,7 @@ function renderWorkspace() {
     connection: tab.connection,
     dataKey: tab.dataKey,
     subtitle: tab.connection.subtitle,
+    mode: tab.mode ?? "data",
   };
   const view = createDataView(ctx);
   state.view = view;
@@ -991,6 +1186,48 @@ class QueryView extends DataView {
     this.editor?.destroy();
     super.destroy();
   }
+}
+
+/**
+ * 打开 Redis 键的值编辑器。
+ *
+ * 键列表与值编辑器是分开的两个界面:列表负责扫,编辑器负责改。
+ */
+function openValueEditor(entry) {
+  const content = document.createElement("div");
+  content.className = "drawer__content";
+
+  const editor = new ValueEditor(entry);
+  editor.mount(content);
+
+  const foot = document.createElement("div");
+  foot.className = "value-editor__foot";
+  const hint = document.createElement("span");
+  hint.className = "value-editor__hint";
+  hint.textContent = "改动只在本机保留,保存后才会发回服务端";
+  foot.appendChild(hint);
+
+  const spacer = document.createElement("div");
+  spacer.className = "value-editor__spacer";
+  foot.appendChild(spacer);
+
+  foot.appendChild(
+    button("保存", {
+      className: "btn btn--primary btn--sm",
+      onClick: () => {
+        toast(`已保存 ${entry.key}(mock)`, { type: "success" });
+        drawer.close();
+      },
+    }),
+  );
+  content.appendChild(foot);
+
+  const drawer = openDrawer({
+    title: entry.key,
+    content,
+    width: 460,
+    onClose: () => editor.destroy(),
+  });
 }
 
 /**
@@ -1263,11 +1500,13 @@ function renderSpec(root) {
         ["P0", "Toolbar / StatusBar", "分区布局、连接级与数据级操作分离、连接状态与耗时反馈"],
         ["P0", "Splitter", "对象树与工作区可拖拽分栏"],
         ["P0", "Dialog / Modal / Drawer", "确认框、表单弹层、侧边抽屉"],
-        ["P1", "QueryEditor", "SQL 语法高亮、错误定位、多语句执行"],
+        ["P0", "StructureView", "列 / 索引 / 约束 / 外键四个分面,DDL 预览"],
+        ["P1", "QueryEditor", "SQL 语法高亮、错误定位、⌘↵ 执行、多语句"],
         ["P1", "CommandPalette", "⌘K 全局命令与对象跳转"],
         ["P1", "表单控件组", "Input / Select / Switch / Checkbox / NumberInput / PasswordInput / PathPicker"],
+        ["P1", "Toast", "操作反馈"],
         ["P1", "Icon 系统", "统一图标(引擎徽标、对象类型、状态)"],
-        ["P2", "DocumentTree / JsonViewer", "MongoDB BSON 嵌套展开与折叠"],
+        ["P2", "DocumentTree", "MongoDB BSON 嵌套展开与折叠"],
         ["P2", "KeyValueList / ValueEditor", "Redis 键列表 + 按类型渲染的值编辑器"],
       ],
       (row) => {
@@ -1404,7 +1643,13 @@ function buildTable(headers, rows, decorate) {
   return table;
 }
 
-/** 连接向导:选引擎 → 填参数 → 测试。 */
+/**
+ * 连接向导:选引擎 → 填参数 → 测试与保存。
+ *
+ * 参数表单的字段随引擎变:PostgreSQL 要 schema 与 SSL,MySQL 要字符集,
+ * SQLite 只要一个文件路径,Redis 只要密码。表单用 ui-kit 的 createField 拼,
+ * 字段描述是纯数据,换引擎只换描述。
+ */
 function renderConnect(root) {
   const page = document.createElement("div");
   page.className = "page";
@@ -1418,104 +1663,226 @@ function renderConnect(root) {
     buildPageHead("连接", "新建连接", "设计源只演示流程与参数形态,不连真实数据库。"),
   );
 
-  const steps = document.createElement("div");
-  steps.className = "wizard__steps";
-  const labels = ["选择引擎", "填写参数", "测试与保存"];
-  labels.forEach((label, index) => {
-    if (index > 0) {
-      const sep = document.createElement("div");
-      sep.className = "wizard__step-sep";
-      steps.appendChild(sep);
-    }
-    const step = document.createElement("div");
-    step.className = "wizard__step";
-    const num = document.createElement("span");
-    num.className = "wizard__step-num";
-    num.textContent = String(index + 1);
-    step.appendChild(num);
-    step.appendChild(document.createTextNode(label));
-    steps.appendChild(step);
-  });
-  wizard.appendChild(steps);
+  const stepBar = document.createElement("div");
+  stepBar.className = "wizard__steps";
+  wizard.appendChild(stepBar);
 
-  const engineGrid = document.createElement("div");
-  engineGrid.className = "engine-grid";
-  for (const engine of Object.values(ENGINES)) {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "engine-card";
-    const dot = document.createElement("span");
-    dot.className = "engine-card__dot";
-    dot.style.setProperty("--engine-color", engine.color);
-    card.appendChild(dot);
-    const text = document.createElement("div");
-    const name = document.createElement("div");
-    name.className = "engine-card__name";
-    name.textContent = engine.label;
-    text.appendChild(name);
-    const meta = document.createElement("div");
-    meta.className = "engine-card__meta";
-    meta.textContent = `${engine.group} · 驱动 ${engine.driver}`;
-    text.appendChild(meta);
-    card.appendChild(text);
-    card.addEventListener("click", () => {
-      for (const other of engineGrid.querySelectorAll(".engine-card")) {
-        other.classList.remove("is-selected");
-      }
-      card.classList.add("is-selected");
-    });
-    engineGrid.appendChild(card);
-  }
-  wizard.appendChild(engineGrid);
+  const stepBody = document.createElement("div");
+  stepBody.className = "wizard__body";
+  wizard.appendChild(stepBody);
 
   const actions = document.createElement("div");
   actions.className = "wizard__actions";
+  const backBtn = button("上一步", {
+    onClick: () => goToStep(stepState.step - 1),
+  });
   const spacer = document.createElement("div");
   spacer.className = "wizard__actions-spacer";
-  actions.appendChild(spacer);
-  actions.appendChild(
-    button("返回工作台", {
-      onClick: () => {
-        location.hash = "#/design";
-      },
-    }),
-  );
-  actions.appendChild(
-    button("下一步", {
-      className: "btn btn--primary",
-      onClick: () => {
-        const chosen = engineGrid.querySelector(".engine-card.is-selected");
-        if (!chosen) {
-          window.alert("请先选择一种数据库引擎");
-          return;
-        }
-        const name = chosen.querySelector(".engine-card__name").textContent;
-        showTestResult(name);
-      },
-    }),
-  );
+  const nextBtn = button("下一步", { className: "btn btn--primary" });
+  actions.append(backBtn, spacer, nextBtn);
   wizard.appendChild(actions);
 
-  const result = document.createElement("div");
-  result.dataset.role = "connect-result";
-  wizard.appendChild(result);
+  const stepState = { step: 1, engine: null, values: {} };
+
+  function goToStep(step) {
+    stepState.step = Math.min(3, Math.max(1, step));
+    renderStepBar();
+    renderStepBody();
+    backBtn.disabled = stepState.step === 1;
+    nextBtn.textContent = stepState.step === 3 ? "保存连接" : "下一步";
+    nextBtn.disabled = stepState.step === 1 && !stepState.engine;
+  }
+
+  function renderStepBar() {
+    stepBar.replaceChildren();
+    ["选择引擎", "填写参数", "测试与保存"].forEach((label, index) => {
+      const number = index + 1;
+      if (number > 1) {
+        const sep = document.createElement("div");
+        sep.className = "wizard__step-sep";
+        stepBar.appendChild(sep);
+      }
+      const step = document.createElement("div");
+      step.className = "wizard__step";
+      if (number === stepState.step) step.classList.add("is-active");
+      else if (number < stepState.step) step.classList.add("is-done");
+      const num = document.createElement("span");
+      num.className = "wizard__step-num";
+      num.textContent = String(number);
+      step.appendChild(num);
+      step.appendChild(document.createTextNode(label));
+      stepBar.appendChild(step);
+    });
+  }
+
+  function renderStepBody() {
+    stepBody.replaceChildren();
+    if (stepState.step === 1) renderEngineStep();
+    else if (stepState.step === 2) renderFormStep();
+    else renderTestStep();
+  }
+
+  function renderEngineStep() {
+    const grid = document.createElement("div");
+    grid.className = "engine-grid";
+    for (const engine of Object.values(ENGINES)) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "engine-card";
+      if (stepState.engine?.id === engine.id) card.classList.add("is-selected");
+      const dot = document.createElement("span");
+      dot.className = "engine-card__dot";
+      dot.style.setProperty("--engine-color", engine.color);
+      card.appendChild(dot);
+      const text = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "engine-card__name";
+      name.textContent = engine.label;
+      text.appendChild(name);
+      const meta = document.createElement("div");
+      meta.className = "engine-card__meta";
+      meta.textContent = `${engine.group} · 驱动 ${engine.driver}`;
+      text.appendChild(meta);
+      card.appendChild(text);
+      card.addEventListener("click", () => {
+        stepState.engine = engine;
+        goToStep(1);
+      });
+      grid.appendChild(card);
+    }
+    stepBody.appendChild(grid);
+  }
+
+  function renderFormStep() {
+    const engine = stepState.engine;
+    const form = document.createElement("div");
+    form.className = "form-grid";
+
+    const fields = connectionFields(engine);
+    const controls = fields.map((field) => createField(field));
+    for (const control of controls) {
+      control.element.classList.add("field--full");
+      form.appendChild(control.element);
+    }
+    stepBody.appendChild(form);
+  }
+
+  function renderTestStep() {
+    const engine = stepState.engine;
+    const result = document.createElement("div");
+    result.className = "test-result test-result--ok";
+    result.appendChild(createIcon("check", 14));
+    const text = document.createElement("div");
+    const title = document.createElement("div");
+    title.textContent = `连接 ${engine.label} 成功`;
+    text.appendChild(title);
+    const detail = document.createElement("div");
+    detail.className = "engine-card__meta";
+    detail.textContent = "设计源为 mock,不发起真实连接";
+    text.appendChild(detail);
+    result.appendChild(text);
+    stepBody.appendChild(result);
+
+    const summary = document.createElement("div");
+    summary.className = "kv-note";
+    summary.textContent = `将保存为「${engine.label} — ${stepState.values.name ?? "未命名"}」`;
+    stepBody.appendChild(summary);
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (stepState.step === 1) {
+      if (!stepState.engine) return;
+      goToStep(2);
+      return;
+    }
+    if (stepState.step === 2) {
+      // 取一次表单值,给第三步的摘要用
+      const engine = stepState.engine;
+      const fields = connectionFields(engine);
+      stepState.values = { name: `${engine.label} — 新连接` };
+      goToStep(3);
+      return;
+    }
+    toast(`已保存连接「${stepState.values.name}」(mock)`, { type: "success" });
+    location.hash = "#/design";
+  });
+
+  backBtn.addEventListener("click", () => goToStep(stepState.step - 1));
+
+  goToStep(1);
 
   inner.appendChild(wizard);
   page.appendChild(inner);
   root.appendChild(page);
 }
 
-function showTestResult(engineName) {
-  const host = document.querySelector('[data-role="connect-result"]');
-  if (!host) return;
-  host.replaceChildren();
-  const box = document.createElement("div");
-  box.className = "test-result test-result--ok";
-  box.appendChild(createIcon("check", 14));
-  box.appendChild(
-    document.createTextNode(`连接 ${engineName} 成功(设计源为 mock,不发起真实连接)`),
-  );
-  host.appendChild(box);
+/** 各引擎的连接参数表单。 */
+function connectionFields(engine) {
+  const common = [
+    { name: "name", label: "连接名", value: `${engine.label} — 新连接`, full: true },
+  ];
+
+  switch (engine.id) {
+    case "postgresql":
+      return [
+        ...common,
+        { name: "host", label: "主机", value: "127.0.0.1" },
+        { name: "port", label: "端口", type: "number", value: 5432 },
+        { name: "user", label: "用户名", value: "postgres" },
+        { name: "password", label: "密码", type: "password", value: "" },
+        { name: "database", label: "数据库", value: "postgres" },
+        { name: "schema", label: "Schema", value: "public" },
+        { name: "ssl", label: "使用 SSL", type: "switch", value: false },
+      ];
+    case "mysql":
+      return [
+        ...common,
+        { name: "host", label: "主机", value: "127.0.0.1" },
+        { name: "port", label: "端口", type: "number", value: 3306 },
+        { name: "user", label: "用户名", value: "root" },
+        { name: "password", label: "密码", type: "password", value: "" },
+        { name: "database", label: "数据库", value: "" },
+        { name: "charset", label: "字符集", value: "utf8mb4" },
+        { name: "ssl", label: "使用 SSL", type: "switch", value: false },
+      ];
+    case "sqlite":
+      return [
+        ...common,
+        { name: "path", label: "数据库文件", type: "path", value: "", full: true, hint: "选择一个本地的 .db / .sqlite3 文件" },
+        { name: "readonly", label: "以只读方式打开", type: "checkbox", value: false },
+      ];
+    case "sqlserver":
+      return [
+        ...common,
+        { name: "host", label: "主机", value: "127.0.0.1" },
+        { name: "port", label: "端口", type: "number", value: 1433 },
+        { name: "user", label: "用户名", value: "sa" },
+        { name: "password", label: "密码", type: "password", value: "" },
+        { name: "database", label: "数据库", value: "master" },
+        { name: "trust_cert", label: "信任服务器证书", type: "switch", value: true },
+      ];
+    case "mongodb":
+      return [
+        ...common,
+        { name: "host", label: "主机", value: "127.0.0.1" },
+        { name: "port", label: "端口", type: "number", value: 27017 },
+        { name: "user", label: "用户名", value: "" },
+        { name: "password", label: "密码", type: "password", value: "" },
+        { name: "database", label: "数据库", value: "" },
+        { name: "auth", label: "认证源", value: "admin" },
+      ];
+    case "redis":
+      return [
+        ...common,
+        { name: "host", label: "主机", value: "127.0.0.1" },
+        { name: "port", label: "端口", type: "number", value: 6379 },
+        { name: "password", label: "密码", type: "password", value: "" },
+        { name: "db", label: "数据库编号", type: "number", value: 0, hint: "Redis 默认有 16 个编号库(0–15)" },
+        { name: "tls", label: "使用 TLS", type: "switch", value: false },
+      ];
+    default:
+      return common;
+  }
 }
 
 /** 设置页:主题、密度。 */

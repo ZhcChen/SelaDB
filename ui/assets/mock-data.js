@@ -1059,3 +1059,358 @@ export const UI_COPY = {
     events: '事件',
   },
 };
+
+/* =============================================================================
+ * 表结构
+ *
+ * 列定义从 TABLE_DATA 派生 —— 同一份列不能在两处维护,否则改一处另一处就
+ * 对不上。索引、约束、外键按各引擎的习惯补齐:PostgreSQL 用 schema 限定名、
+ * btree 索引方法和独立的外键 ALTER 语句;MySQL 用反引号、KEY 索引和
+ * ENGINE=InnoDB 的建表尾巴。
+ * ========================================================================== */
+
+/** 列名 → 中文注释。只覆盖常见的,覆盖不到就不写注释。 */
+const COLUMN_COMMENTS = {
+  id: "主键",
+  uuid: "唯一标识",
+  user_id: "所属用户",
+  order_id: "所属订单",
+  product_id: "所属商品",
+  order_no: "订单编号",
+  order_sn: "订单编号",
+  order_status: "订单状态",
+  status: "状态",
+  email: "邮箱地址",
+  username: "登录名",
+  name: "名称",
+  full_name: "姓名",
+  display_name: "显示名",
+  title: "标题",
+  sku: "库存编码",
+  sku_code: "库存编码",
+  phone: "手机号",
+  token: "会话令牌",
+  currency: "币种",
+  balance: "账户余额",
+  total_amount: "订单总额",
+  total_spent: "累计消费",
+  price: "单价",
+  unit_price: "单价",
+  amount: "金额",
+  fee: "手续费",
+  quantity: "数量",
+  stock: "库存量",
+  item_count: "条目数",
+  order_count: "订单数",
+  is_active: "是否启用",
+  is_paid: "是否已支付",
+  is_vip: "是否 VIP",
+  is_verified: "是否已认证",
+  is_success: "是否成功",
+  is_refunded: "是否已退款",
+  on_sale: "是否在售",
+  is_gift: "是否赠品",
+  created_at: "创建时间",
+  updated_at: "更新时间",
+  deleted_at: "删除时间",
+  paid_at: "支付时间",
+  expires_at: "过期时间",
+  last_seen_at: "最后活跃时间",
+  last_login_at: "最后登录时间",
+  registered_at: "注册时间",
+  generated_at: "生成时间",
+  remark: "备注",
+  bio: "个人简介",
+  tags: "标签",
+  payload: "业务载荷",
+  detail: "明细",
+  attributes: "扩展属性",
+  preferences: "偏好设置",
+  shipping_address: "收货地址",
+  ip_address: "来源 IP",
+  user_agent: "客户端标识",
+  device: "设备类型",
+  avatar: "头像",
+  thumbnail: "缩略图",
+  locale: "语言地区",
+};
+
+/** 状态列的取值范围,用来生成 CHECK 约束。 */
+const STATUS_VALUES = {
+  status: ["active", "inactive", "banned", "pending"],
+  order_status: ["created", "paid", "shipped", "completed", "cancelled", "refunded"],
+  pay_channel: ["alipay", "wechat", "card", "balance"],
+  method: ["alipay", "wechat", "card", "bank"],
+  tier: ["bronze", "silver", "gold", "platinum"],
+  device: ["ios", "android", "web", "desktop"],
+};
+
+/** `_id` 后缀列 → 被引用的表。 */
+const FK_TARGETS = {
+  user_id: "users",
+  order_id: "orders",
+  product_id: "products",
+};
+
+/** 天然键列:这类列上会建唯一索引。 */
+const UNIQUE_KEY_COLUMNS = new Set([
+  "email", "username", "order_no", "order_sn", "sku", "sku_code", "token", "uuid", "request_id",
+]);
+
+/** 时间列:这类列上会建普通索引。 */
+const INDEXED_TIME_COLUMNS = new Set([
+  "created_at", "updated_at", "paid_at", "last_seen_at", "last_login_at",
+]);
+
+/** 推导列的默认值。 */
+function deriveDefault(column, engine) {
+  const key = column.key;
+  if (column.pk) {
+    if (engine === "mysql") return null; // 自增在 DDL 里用 AUTO_INCREMENT 表达
+    if (/serial/i.test(column.type)) return `nextval('${key}_seq'::regclass)`;
+    return null;
+  }
+  if (key === "created_at" || key === "updated_at") {
+    return engine === "mysql" ? "CURRENT_TIMESTAMP" : "now()";
+  }
+  if (key === "status") return "'active'";
+  if (key === "order_status") return "'created'";
+  if (key === "currency") return "'CNY'";
+  const boolTrue = engine === "mysql" ? 1 : true;
+  const boolFalse = engine === "mysql" ? 0 : false;
+  if (key === "is_active" || key === "is_paid" || key === "on_sale" || key === "is_vip") return boolTrue;
+  if (key === "is_verified" || key === "is_gift") return boolFalse;
+  if (key === "balance" || key === "price" || key === "unit_price" || key === "total_amount") return "0.00";
+  if (key === "stock" || key === "quantity" || key === "item_count") return 0;
+  return null;
+}
+
+/** 推导一份表结构。 */
+function buildStructure(dataKey, data, engine) {
+  const isView = /\/views?\//.test(dataKey) || /_v_|^v_/.test(dataKey.split("/").pop());
+
+  const columns = data.columns.map((column, index) => ({
+    name: column.name ?? column.key,
+    type: column.type,
+    nullable: column.pk ? false : column.nullable ?? true,
+    default: deriveDefault(column, engine),
+    pk: Boolean(column.pk),
+    position: index + 1,
+    comment: COLUMN_COMMENTS[column.key] ?? null,
+  }));
+
+  const tableName = dataKey.split("/").pop();
+  const indexes = [];
+  const constraints = [];
+  const foreignKeys = [];
+
+  if (!isView) {
+    // 主键索引
+    const pkColumn = columns.find((column) => column.pk);
+    if (pkColumn) {
+      indexes.push({
+        name: `${tableName}_pkey`,
+        columns: [pkColumn.name],
+        unique: true,
+        primary: true,
+        method: engine === "mysql" ? null : "btree",
+      });
+    }
+
+    for (const column of columns) {
+      if (column.pk) continue;
+
+      if (UNIQUE_KEY_COLUMNS.has(column.name)) {
+        indexes.push({
+          name: `${tableName}_${column.name}_key`,
+          columns: [column.name],
+          unique: true,
+          primary: false,
+          method: engine === "mysql" ? null : "btree",
+        });
+        continue;
+      }
+
+      if (FK_TARGETS[column.name]) {
+        indexes.push({
+          name: `${tableName}_${column.name}_idx`,
+          columns: [column.name],
+          unique: false,
+          primary: false,
+          method: engine === "mysql" ? null : "btree",
+        });
+        foreignKeys.push({
+          name: `${tableName}_${column.name}_fkey`,
+          columns: [column.name],
+          refTable: FK_TARGETS[column.name],
+          refColumns: ["id"],
+          onUpdate: "NO ACTION",
+          onDelete: column.name === "user_id" ? "CASCADE" : "NO ACTION",
+        });
+        continue;
+      }
+
+      if (INDEXED_TIME_COLUMNS.has(column.name)) {
+        indexes.push({
+          name: `${tableName}_${column.name}_idx`,
+          columns: [column.name],
+          unique: false,
+          primary: false,
+          method: engine === "mysql" ? null : "btree",
+        });
+      }
+    }
+
+    for (const column of columns) {
+      const values = STATUS_VALUES[column.name];
+      if (!values) continue;
+      constraints.push({
+        name: `${tableName}_${column.name}_check`,
+        type: "CHECK",
+        column: column.name,
+        values,
+      });
+    }
+  }
+
+  return { qualifiedName: qualifiedNameOf(dataKey, engine), isView, columns, indexes, constraints, foreignKeys };
+}
+
+/** 表的限定名:PostgreSQL 带 schema,MySQL 带库名。 */
+function qualifiedNameOf(dataKey, engine) {
+  const parts = dataKey.split("/");
+  const table = parts[parts.length - 1];
+  if (engine === "postgresql") return `public.${table}`;
+  if (engine === "mysql") return `${parts[1]}.${table}`;
+  return table;
+}
+
+/** 引擎 id:从 dataKey 的连接前缀推断。 */
+function engineOf(dataKey) {
+  const connectionId = dataKey.split("/")[0];
+  const connection = CONNECTIONS.find((item) => item.id === connectionId);
+  return connection?.engine ?? "postgresql";
+}
+
+export const TABLE_STRUCTURE = Object.fromEntries(
+  Object.entries(TABLE_DATA).map(([dataKey, data]) => [
+    dataKey,
+    buildStructure(dataKey, data, engineOf(dataKey)),
+  ]),
+);
+
+/**
+ * 生成 DDL。
+ *
+ * 目标是「看起来就是那个引擎导出来的」:PostgreSQL 用 schema 限定名、
+ * 独立的外键 ALTER 语句;MySQL 用反引号、KEY 索引、ENGINE 尾巴。
+ */
+export function generateDdl(dataKey) {
+  const structure = TABLE_STRUCTURE[dataKey];
+  if (!structure) return "";
+  const engine = engineOf(dataKey);
+  return engine === "mysql" ? mysqlDdl(structure) : postgresDdl(structure);
+}
+
+function postgresDdl(structure) {
+  const { qualifiedName, isView, columns, indexes, constraints, foreignKeys } = structure;
+  const table = qualifiedName.split(".").pop();
+
+  if (isView) {
+    return [
+      `CREATE VIEW ${qualifiedName} AS`,
+      `SELECT ${columns.map((c) => c.name).join(",")}`,
+      `  FROM public.${table};`,
+    ].join("\n");
+  }
+
+  const lines = [];
+  lines.push(`CREATE TABLE ${qualifiedName} (`);
+  const body = [];
+
+  for (const column of columns) {
+    const parts = [`    ${column.name} ${column.type}`];
+    if (!column.nullable) parts.push("NOT NULL");
+    if (column.default !== null && column.default !== undefined) parts.push(`DEFAULT ${column.default}`);
+    // PG 10 以后的自增主键写法,比 serial 更接近现在的实践
+    if (column.pk && column.default === null && /^(small|big)?int/.test(column.type)) {
+      parts.push("GENERATED BY DEFAULT AS IDENTITY");
+    }
+    body.push(parts.join(" "));
+  }
+
+  for (const index of indexes.filter((item) => item.primary)) {
+    body.push(`    CONSTRAINT ${index.name} PRIMARY KEY (${index.columns.join(", ")})`);
+  }
+  for (const index of indexes.filter((item) => item.unique && !item.primary)) {
+    body.push(`    CONSTRAINT ${index.name} UNIQUE (${index.columns.join(", ")})`);
+  }
+  for (const constraint of constraints) {
+    body.push(
+      `    CONSTRAINT ${constraint.name} CHECK (${constraint.column} = ANY (ARRAY[${constraint.values.map((v) => `'${v}'`).join(",")}]))`,
+    );
+  }
+
+  lines.push(body.join(",\n"));
+  lines.push(");");
+
+  for (const index of indexes.filter((item) => !item.primary && !item.unique)) {
+    lines.push("");
+    lines.push(
+      `CREATE INDEX ${index.name} ON ${qualifiedName} USING ${index.method} (${index.columns.join(", ")});`,
+    );
+  }
+
+  for (const fk of foreignKeys) {
+    lines.push("");
+    lines.push(`ALTER TABLE ${qualifiedName}`);
+    lines.push(
+      `    ADD CONSTRAINT ${fk.name} FOREIGN KEY (${fk.columns.join(", ")}) REFERENCES public.${fk.refTable}(${fk.refColumns.join(", ")}) ON UPDATE ${fk.onUpdate} ON DELETE ${fk.onDelete};`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function mysqlDdl(structure) {
+  const { qualifiedName, isView, columns, indexes, constraints } = structure;
+  const [database, table] = qualifiedName.split(".");
+
+  if (isView) {
+    return [
+      `CREATE VIEW \`${database}\`.\`${table}\` AS`,
+      `SELECT ${columns.map((c) => `\`${c.name}\``).join(",")}`,
+      `  FROM \`${database}\`.\`${table}\`;`,
+    ].join("\n");
+  }
+
+  const body = [];
+  for (const column of columns) {
+    const parts = [`  \`${column.name}\` ${column.type}`];
+    if (column.pk && /bigint|int/i.test(column.type)) parts.push("NOT NULL AUTO_INCREMENT");
+    else if (!column.nullable) parts.push("NOT NULL");
+    if (column.default !== null && column.default !== undefined) parts.push(`DEFAULT ${column.default}`);
+    body.push(parts.join(" "));
+  }
+
+  for (const index of indexes.filter((item) => item.primary)) {
+    body.push(`  PRIMARY KEY (${index.columns.map((c) => `\`${c}\``).join(", ")})`);
+  }
+  for (const index of indexes.filter((item) => item.unique && !item.primary)) {
+    body.push(`  UNIQUE KEY \`${index.name}\` (${index.columns.map((c) => `\`${c}\``).join(", ")})`);
+  }
+  for (const index of indexes.filter((item) => !item.primary && !item.unique)) {
+    body.push(`  KEY \`${index.name}\` (${index.columns.map((c) => `\`${c}\``).join(", ")})`);
+  }
+  for (const constraint of constraints) {
+    body.push(
+      `  CONSTRAINT \`${constraint.name}\` CHECK (\`${constraint.column}\` IN (${constraint.values.map((v) => `'${v}'`).join(",")}))`,
+    );
+  }
+
+  return [
+    `CREATE TABLE \`${database}\`.\`${table}\` (`,
+    body.join(",\n"),
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;",
+  ].join("\n");
+}
