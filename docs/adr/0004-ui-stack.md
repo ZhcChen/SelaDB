@@ -31,12 +31,17 @@ CLI 与 MCP 的选型不受 GUI 决策影响（见 ADR-0003）。GUI 选型的�
 
 ## 决策
 
+> ⚠️ **本节是 2026-10-21 下午 gpui 路线的原决策，已整体作废。**
+> 当前路线：GUI 框架自研 `crates/gui-core/`（taffy + cosmic-text + wgpu + winit），
+> 不引入 gpui 作为依赖 —— 见 [ADR-0006](0006-self-built-gui-core.md)。
+> 下面两行保留原文只为记录当时的选型依据。
+
 **全项目使用 Rust**（这是 2026-10-21 下午的最终方向，与 ADR-0001 的 Go 方案不同，详见「决策沿革」）。
 
 | 层 | 选型 | 版本 |
 |---|---|---|
-| GUI 框架 | `gpui`（Zed 的框架，Apache-2.0） | 0.2.2 |
-| GUI 组件自建 | 基于 `layout.List` / `uniform_list` / `interactivity` | — |
+| GUI 框架 | ~~`gpui`（Zed 的框架，Apache-2.0）~~ **已由自研 `crates/gui-core/` 取代** | ~~0.2.2~~ |
+| GUI 组件自建 | ~~基于 `layout.List` / `uniform_list` / `interactivity`~~ **全部自写**（参考蓝本见 ADR-0006） | — |
 | 语法高亮 | tree-sitter（`tree-sitter-sql` + `tree-sitter-highlight`） | — |
 | CLI 框架 | `clap` | 4.6.7 |
 | MCP SDK | `rmcp`（官方 Rust SDK） | 3.6.0 |
@@ -55,7 +60,7 @@ CLI 与 MCP 的选型不受 GUI 决策影响（见 ADR-0003）。GUI 选型的�
 | Fyne | v2.8.2 | 渲染后端只有 OpenGL，而 Apple 已全面弃用 OpenGL；全平台需 cgo（glfw）；桌面中文 IME 有 3 个 open issue（#618 / #2777 / #2418） |
 | egui | 0.37.0 | 组件最好，但中文 IME 在 X11 + Fcitx5 下有边界问题（#7975，Wayland + IBus 正常）；且是 Rust 生态里最像「工具型」的观感 |
 | Slint | 1.18.1 | 中文 IME 桌面端可用、原生渲染（Skia），但**无 Table 组件**、需学 `.slint` DSL |
-| GPUI | 0.2.2 | **采用** |
+| GPUI | 0.2.2 | ~~**采用**~~ **已作废**（2026-10-22，见 ADR-0006；降级为只读参考蓝本） |
 | therecipe/qt | 2020-09 停更 | 已废弃 |
 | lxn/walk / andlabs/ui | 2021 停更 | 已废弃 |
 | gotk4 | v0.4.1 | GTK 依赖导致三平台观感割裂 |

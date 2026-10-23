@@ -51,7 +51,7 @@ SelaDB/
 
 Rust 的 crate 边界天然对应「编译单元」与「依赖隔离」：
 
-- GUI 依赖 `gpui`（重，含 blade-graphics 与 Metal shader 编译），CLI 与 MCP 都不需要 —— 单 crate 会让 `cargo build` 拖上 GUI 的全部依赖
+- GUI 依赖 `crates/gui-core`（重，含 wgpu 与字体栈），CLI 与 MCP 都不需要 —— 单 crate 会让 `cargo build` 拖上 GUI 的全部依赖
 - 依赖版本可以按需独立演进（例如 GUI 想用 wgpu，CLI 不需要）
 - crate 边界即架构边界的强制约束：GUI 代码无法被 CLI 意外依赖
 
@@ -92,7 +92,7 @@ Rust 慢的是**冷编译**，只在新克隆、CI 无缓存、依赖大版本�
 
 读 Gio 源码后发现三个问题：① `layout/` 下只有 `flex.go` / `stack.go` / `list.go`，**没有 CSS Grid**，而数据表格的经典布局正是 Grid；② **没有任何阴影原语**，而 `box-shadow` 在现代设计里很常见；③ 官方 tag 政策是「pre-1.0 tags 仅供参考，不指定有持续支持的版本，bugfix 不会回移」，**等于不能锁版本，必须跟 main**。
 
-而 Rust 侧的 **GPUI 同时解决这三个问题**：Taffy 提供与浏览器同源的 Flexbox + Grid + Block 全套；gpui 有原生 `BoxShadow` 与 `linear_gradient()`；且 gpui 是**正常发布的 crate，一年一版，可以锁版本**。
+而 Rust 侧**能自研出解决这三个问题的框架**：Taffy 提供与浏览器同源的 Flexbox + Grid + Block 全套；wgpu 走 naga 的纯 Rust 着色器翻译，不需要 Metal shader 的离线编译；且依赖都能锁版本。（路线于 2026-10-22 从 GPUI 改为自研 `crates/gui-core/`，见 [ADR-0006](0006-self-built-gui-core.md)）
 
 同时，实测证明「Rust 编译慢」这一选型前提不成立（增量 0.62–0.99s，与 Go 持平）。
 
