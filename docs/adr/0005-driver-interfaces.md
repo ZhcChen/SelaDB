@@ -57,3 +57,23 @@ if let Some(lister) = conn.as_table_lister() {
 - 调用方要做类型断言，代码比胖接口啰嗦
 - 需要一份「引擎能力矩阵」的文档，供 UI 层决定显示什么。放在 `docs/engine-support.md`，随引擎支持情况维护
 - **不能**用宏或代码生成来消除能力探测的样板代码 —— 那样会把编译期检查换成运行时失败，得不偿失
+
+## 修订：Rust 里的能力探测形状（2026-10-24）
+
+ADR 原文用的是 Go 的类型断言（`conn.(TableLister)`）。**Rust 里 `dyn Conn`
+不能下转型成 `dyn TableLister`** —— `Any::downcast_ref` 要求目标类型是
+`Sized`，trait object 不是。
+
+Rust 侧采用等价写法：**可选能力各有一个返回 `Option<&dyn Trait>` 的访问器，
+默认实现是 `None`**，实现了该能力的连接覆写对应项。放在 `Conn` 上，
+由 `ConnExt` 转发。
+
+这没有改变 ADR 的本意：操作仍然住在各自的小 trait 里，`Conn` 上**没有**
+`list_columns()` 这种「逼所有引擎都实现、Redis 只能永远报错」的方法 ——
+Redis 只是不覆写 `table_lister()`，那项能力就不存在。
+
+SQLite 驱动是这套形状的第一个实例：它实现了 `DatabaseLister` /
+`TableLister` / `ColumnLister` / `Querier` / `Execer`，
+**故意不实现 `SchemaLister`** —— SQLite 没有 schema 概念。
+`crates/seladb-core/tests/service.rs` 里有断言守着这件事，
+防止以后有人「顺手补一个返回空列表的实现」。

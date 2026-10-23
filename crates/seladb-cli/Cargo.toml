@@ -1,0 +1,17 @@
+[package]
+name = "seladb-cli"
+description = "SelaDB 命令行入口"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "seladb"
+path = "src/main.rs"
+
+[dependencies]
+seladb-core.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -41,9 +41,31 @@ crates/gui-core/        自研 GUI 框架（taffy + cosmic-text + wgpu + winit�
 ui/                     UI 设计源（纯 HTML + CSS + JS，不进 Cargo 工作区）
 design/tokens.json      唯一设计源：颜色/间距/字号/圆角/阴影/动效
 docs/                   架构文档与 ADR
+docs/lessons/           经验库：每轮开发沉淀的可迁移教训
+scripts/acceptance.sh   验收脚本：跑通整条通路的端到端断言
 ```
 
 `seladb-core` 内部再分：`core/`（领域模型）、`driver/`（引擎抽象与实现）、`query/`（查询与结果集）、`session/`（连接与凭据）、`service/`（业务逻辑落点）、`config/`（配置加载）。
+
+## 开发循环
+
+**怎么开发**写在 [`docs/development-loop.md`](docs/development-loop.md)：Propose–Probe–Compose 的两层递归、盲选 rubric、证据纪律、经验库格式。
+
+几条最容易忘的：
+
+- **经验库在 `docs/lessons/`**，每轮收尾要写一条。没有证据支撑的教训不写入 —— 写 `NO_ENTRY`。
+- **评审的结论要逐条用像素/计算样式核实**，误判要驳回。我们已经被同一种幻觉坑过三次。
+- **验证器与被测物分离**：单测不打桩，集成测试用真库真 SQL，验收脚本跑真二进制。
+
+常用命令：
+
+```bash
+cargo build                          # 只建 core 与 cli（gui-core 依赖 wgpu，很重）
+cargo test                           # 单元 + 集成测试
+scripts/acceptance.sh                # 端到端验收
+cd ui && bun run test:smoke          # 设计源功能验收
+cd ui && bun run test:contrast       # 设计源对比度检查
+```
 
 ## UI 设计源（`ui/`）
 

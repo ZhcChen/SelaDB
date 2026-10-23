@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/seladb-core",
+    "crates/seladb-cli",
+    "crates/gui-core",
+]
+
+# gui-core 依赖 wgpu 与字体栈，编译很重。它不属于「标准功能」的依赖图 ——
+# CLI 与 MCP 都不该被它拖慢。默认不参与全量构建，需要时用 `--workspace`。
+default-members = [
+    "crates/seladb-core",
+    "crates/seladb-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+seladb-core = { path = "crates/seladb-core" }
+
+clap = { version = "4.6.7", features = ["derive"] }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[profile.release]
+lto = "thin"

@@ -14,30 +14,47 @@
 
 ## 当前状态
 
-**尚未实现任何引擎。** 本表记录的是 `docs/architecture.md` 中确定的选型与计划顺序。
+| 引擎 | 驱动 | 目标档位 | 当前档位 | 状态 |
+|---|---|---|---|---|
+| SQLite | `rusqlite` 0.40 | 可用 | **可用** | ✅ 已实现（2026-10-24） |
+| PostgreSQL | `tokio-postgres` 0.7.18 / `sqlx` 0.9 | 完整 | — | 计划中 |
+| MySQL / MariaDB | `sqlx` 0.9 | 完整 | — | 计划中 |
+| SQL Server | 待选 | 可用 | — | 计划中 |
+| ClickHouse | `clickhouse-rs` | 可用 | — | 计划中 |
+| Redis | `redis` 1.7.1 | 可用 | — | 计划中 |
+| MongoDB | `mongodb` | 部分 | — | 计划中 |
+| Oracle | 待选 | 尽力而为 | — | 计划中 |
 
-| 引擎 | 驱动 | 计划档位 | 状态 |
-|---|---|---|---|
-| PostgreSQL | `jackc/pgx/v5` v5.11.0 | 完整 | 计划中 |
-| MySQL / MariaDB | `go-sql-driver/mysql` v1.10.1 | 完整 | 计划中 |
-| SQLite | `modernc.org/sqlite` v1.60.1 | 完整 | 计划中 |
-| SQL Server | `microsoft/go-mssqldb` v1.11.2 | 可用 | 计划中 |
-| ClickHouse | `ClickHouse/clickhouse-go/v2` v2.49.0 | 可用 | 计划中 |
-| Redis | `redis/go-redis/v9` v9.23.0 | 可用 | 计划中 |
-| MongoDB | `mongodb/mongo-go-driver/v2` v2.9.2 | 部分 | 计划中 |
-| Oracle | `sijms/go-ora/v2` v2.9.0 | 尽力而为 | 计划中 |
+SQLite 是**第一个**落地的引擎，不是随手挑的 —— 它不需要服务器、不需要网络、
+能用 `bundled` 特性静态编译，是验证「引擎抽象站不站得住」最省事的样本。
+拿它当第一块，后面每个引擎照它的形状抄。
 
-首批建议只做 PostgreSQL + MySQL + SQLite 三个，把引擎抽象和 UI 打磨好之后再扩展。
+### SQLite 当前做到哪一步
+
+已实现：连接、列出数据库（附着库）、列出表、列出列（含类型/可空/主键）、
+查询、写操作、行数估计。
+
+**没有实现**：事务、schema（SQLite 没这个概念）、DDL 预览、类型元数据
+（`PRAGMA table_info` 给的类型声明是原样透传的，不是引擎归一化的类型）。
+
+---
 
 ## 能力矩阵
 
-实现一个引擎后，在这里勾选它实际支持的能力项。列对应 `docs/adr/0005-driver-interfaces.md` 中定义的可选接口。
+列对应 `docs/adr/0005-driver-interfaces.md` 中定义的可选接口。
+`—` 表示该引擎压根没有这个概念，**不是**「没实现」。
 
 | 引擎 | Databases | Schemas | Tables | Columns | Query | Exec | 事务 |
 |---|---|---|---|---|---|---|---|
+| SQLite | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
 | PostgreSQL | — | — | — | — | — | — | — |
 | MySQL | — | — | — | — | — | — | — |
-| SQLite | — | — | — | — | — | — | — |
+| SQL Server | — | — | — | — | — | — | — |
+| ClickHouse | — | — | — | — | — | — | — |
+| Redis | — | — | — | — | — | — | — |
+| MongoDB | — | — | — | — | — | — | — |
+| Oracle | — | — | — | — | — | — | — |
+
 | SQL Server | — | — | — | — | — | — | — |
 | ClickHouse | — | — | — | — | — | — | — |
 | Redis | — | — | — | — | — | — | — |
