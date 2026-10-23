@@ -306,11 +306,14 @@ for each node:
 
 #### taffy 0.15 已覆盖（逐项核实枚举）
 
+> 下表的「设计源需求」列一律按**去注释后**的实际用量统计 —— CSS 注释里
+> 举例写的 `display: flex` 之类不算数，引擎不会去解析注释。
+
 | CSS 能力 | taffy 实现 | 设计源需求 | 缺口 |
 |---|---|---|---|
-| `position` | Static / Relative / Absolute / **Fixed** / **Sticky** | sticky 5、fixed 4 | ✅ 无 |
-| `overflow` | Visible / Clip / Hidden / Scroll（`scrollbar_width` 预留条宽） | auto 14、hidden 28 | ✅ 无 |
-| `display` | Block / FlowRoot / Flex / Grid / None | flex 89、grid 29 | ⚠️ 无 inline-*（§5.4） |
+| `position` | Static / Relative / Absolute / **Fixed** / **Sticky** | sticky 4、fixed 4 | ✅ 无 |
+| `overflow` | Visible / Clip / Hidden / Scroll（`scrollbar_width` 预留条宽） | auto 家族 14（`overflow` 9 + `-x/-y` 5）、hidden 28 | ✅ 无 |
+| `display` | Block / FlowRoot / Flex / Grid / None | flex 87、grid 29（另有 inline-flex 9 / inline-grid 1） | ⚠️ 无 inline-*（§5.4） |
 | grid 轨道 | `repeat(auto-fill/auto-fit, minmax(...))`、`fr`、`max-content`/`min-content`/`fit-content` | 4 处 auto-fill | ✅ 无 |
 | grid 放置 | `GridLine(i16)`，支持负索引 | `1 / -1` | ✅ 无 |
 | flex | `flexbox_balance` 已开 | `flex: none`/`1` | ✅ 无 |
