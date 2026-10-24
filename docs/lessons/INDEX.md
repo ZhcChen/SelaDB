@@ -23,3 +23,4 @@
 | 2026-10-24 | [单测会把 bug 固化](process/2026-10-24-unit-test-freezes-bug.md) | 单元测试断言的是「我当时以为对的行为」 |
 | 2026-10-24 | [截图的字节差异是假的](process/2026-10-24-screenshot-byte-noise.md) | 同一张图重新截图,字节可能不同但像素完全一样 |
 | 2026-10-24 | [排除法:别把并发出现的警告当根因](process/2026-10-24-ruling-out-causes.md) | 警告与失败同时出现,不等于警告是原因 |
+| 2026-10-24 | [截图的浏览器构建要统一](process/2026-10-24-browser-build-consistency.md) | 裸 chromium.launch() 是 headless shell,像素与完整 Chromium 不同 |

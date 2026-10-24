@@ -19,7 +19,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { chromium } from "playwright";
+import { launchBrowser } from "./browser.mjs";
 
 const exec = promisify(execFile);
 
@@ -144,7 +144,7 @@ async function makeComposite(beforePath, afterPath, outPath) {
   const before = (await readFile(beforePath)).toString("base64");
   const after = (await readFile(afterPath)).toString("base64");
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const page = await browser.newPage({ viewport: { width: 1460, height: 1400 } });
 
   // 逐像素差异掩码:有差异处填品红,无差异处压成灰度

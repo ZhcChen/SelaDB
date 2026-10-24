@@ -14,7 +14,7 @@
 import { mkdir, readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { launchBrowser } from "./browser.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shotDir = join(here, "screenshots");
@@ -52,7 +52,7 @@ check(
   moduleSyntax.join(", "),
 );
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
 const consoleErrors = [];

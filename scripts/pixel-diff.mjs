@@ -12,7 +12,7 @@
  *   不同 → 退出码 1,打印差异像素数与前若干处位置
  */
 import { readFile } from "node:fs/promises";
-import { chromium } from "/Users/chen/code/SelaDB/ui/node_modules/playwright/index.mjs";
+import { launchBrowser } from "../ui/tests/browser.mjs";
 
 const [aPath, bPath] = process.argv.slice(2);
 if (!aPath || !bPath) {
@@ -22,7 +22,7 @@ if (!aPath || !bPath) {
 
 const b64 = async (p) => `data:image/png;base64,${(await readFile(p)).toString("base64")}`;
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const page = await browser.newPage();
 await page.setContent("<body></body>");
 

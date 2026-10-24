@@ -18,7 +18,7 @@
  *
  * 用法:node tests/contrast.mjs
  */
-import { chromium } from "playwright";
+import { launchBrowser } from "./browser.mjs";
 
 const ROUTES = [
   ["#/design", "工作台"],
@@ -27,7 +27,7 @@ const ROUTES = [
   ["#/entry", "入口页"],
 ];
 
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 let failures = 0;
 
 for (const [route, label] of ROUTES) {
