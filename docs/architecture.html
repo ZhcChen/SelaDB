@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="SelaDB GUI 架构：HTML / CSS / JS 作为源语言，编译成 Rust。"
+    />
+    <title>SelaDB GUI 架构 · HTML/CSS/JS → Rust</title>
+    <link rel="icon" href="data:," />
+    <!-- 复用设计源的 token：颜色 / 间距 / 字号 / 圆角 / 阴影只有这一份真源 -->
+    <link rel="stylesheet" href="../ui/assets/tokens.css" />
+    <style>
+      /* 本页只写布局。颜色、间距、字号、圆角、阴影一律取自 tokens.css。 */
+      :root {
+        --doc-max: 1120px;
+        --doc-gutter: 28px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        background: var(--bg-canvas);
+        color: var(--fg-default);
+        font-family: var(--font-ui);
+        font-size: var(--fs-base);
+        line-height: var(--lh-base);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ---------------------------------------------------------------- 顶栏 */
+      .top {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-4);
+        height: var(--h-topbar);
+        padding: 0 var(--doc-gutter);
+        background: var(--bg-panel);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .top__mark {
+        width: 16px;
+        height: 16px;
+        border-radius: var(--r-sm);
+        background: linear-gradient(135deg, var(--accent), var(--engine-mongodb));
+        flex: none;
+      }
+
+      .top__title {
+        font-weight: var(--fw-semibold);
+        letter-spacing: var(--tracking-wide);
+      }
+
+      .top__sub {
+        color: var(--fg-muted);
+        font-size: var(--fs-sm);
+      }
+
+      .top__spacer { flex: 1; }
+
+      .top__toggle {
+        height: var(--h-control);
+        padding: 0 var(--sp-4);
+        font: inherit;
+        font-size: var(--fs-sm);
+        color: var(--fg-default);
+        background: var(--bg-input);
+        border: 1px solid var(--border-default);
+        border-radius: var(--r-md);
+        cursor: pointer;
+      }
+      .top__toggle:hover { background: var(--bg-hover); }
+
+      /* ---------------------------------------------------------------- 布局 */
+      .wrap {
+        max-width: var(--doc-max);
+        margin: 0 auto;
+        padding: var(--sp-9) var(--doc-gutter) var(--sp-9);
+      }
+
+      section { margin-bottom: var(--sp-9); }
+
+      h2 {
+        display: flex;
+        align-items: baseline;
+        gap: var(--sp-3);
+        margin: 0 0 var(--sp-4);
+        padding-bottom: var(--sp-2);
+        border-bottom: 1px solid var(--border-subtle);
+        font-size: var(--fs-lg);
+        font-weight: var(--fw-semibold);
+      }
+      h2 .n {
+        font-family: var(--font-mono);
+        font-size: var(--fs-sm);
+        color: var(--fg-subtle);
+        font-weight: var(--fw-normal);
+      }
+
+      h3 {
+        margin: var(--sp-6) 0 var(--sp-3);
+        font-size: var(--fs-md);
+        font-weight: var(--fw-semibold);
+      }
+
+      p { margin: 0 0 var(--sp-3); color: var(--fg-muted); }
+      p strong { color: var(--fg-default); font-weight: var(--fw-semibold); }
+
+      code {
+        font-family: var(--font-code);
+        font-size: var(--fs-code);
+        padding: 1px 5px;
+        background: var(--bg-inset);
+        border-radius: var(--r-xs);
+        color: var(--fg-default);
+      }
+
+      a { color: var(--accent-text); }
+
+      /* ---------------------------------------------------------------- 卡片 */
+      .card {
+        background: var(--bg-raised);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--r-lg);
+        padding: var(--sp-5);
+        box-shadow: var(--shadow-xs);
+      }
+
+      .grid2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--sp-4);
+      }
+      .grid3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--sp-4);
+      }
+      @media (max-width: 860px) {
+        .grid2, .grid3 { grid-template-columns: 1fr; }
+      }
+
+      /* 约束卡片 */
+      .constraint {
+        border-left: 3px solid var(--accent);
+      }
+      .constraint__k {
+        font-weight: var(--fw-semibold);
+        color: var(--fg-default);
+        margin-bottom: var(--sp-2);
+      }
+      .constraint__v {
+        font-size: var(--fs-sm);
+        color: var(--fg-muted);
+      }
+      .constraint__from {
+        margin-top: var(--sp-2);
+        font-size: var(--fs-xs);
+        color: var(--fg-subtle);
+      }
+
+      /* ---------------------------------------------------------------- 表格 */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--fs-sm);
+      }
+      th, td {
+        text-align: left;
+        padding: var(--sp-2) var(--sp-3);
+        border-bottom: 1px solid var(--border-subtle);
+        vertical-align: top;
+      }
+      th {
+        color: var(--fg-muted);
+        font-weight: var(--fw-medium);
+        white-space: nowrap;
+      }
+      td.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      tbody tr:hover { background: var(--bg-hover); }
+      tbody tr:last-child td { border-bottom: none; }
+
+      .ok { color: var(--success); font-weight: var(--fw-semibold); }
+      .no { color: var(--danger); font-weight: var(--fw-semibold); }
+      .warn { color: var(--warning); font-weight: var(--fw-semibold); }
+      .dim { color: var(--fg-subtle); }
+
+      .tag {
+        display: inline-block;
+        padding: 0 var(--sp-2);
+        border-radius: var(--r-full);
+        font-size: var(--fs-xs);
+        font-family: var(--font-mono);
+        background: var(--bg-inset);
+        color: var(--fg-muted);
+        border: 1px solid var(--border-subtle);
+      }
+      .tag--ok { background: var(--success-soft); color: var(--success); border-color: var(--success-border); }
+      .tag--no { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
+      .tag--warn { background: var(--warning-soft); color: var(--warning); border-color: var(--warning-border); }
+
+      /* ---------------------------------------------------------------- 图 */
+      .fig {
+        background: var(--bg-inset);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--r-lg);
+        padding: var(--sp-5);
+        overflow-x: auto;
+      }
+
+      .layer {
+        display: flex;
+        align-items: stretch;
+        gap: var(--sp-3);
+        margin-bottom: var(--sp-2);
+      }
+      .layer__name {
+        flex: none;
+        width: 132px;
+        display: flex;
+        align-items: center;
+        font-size: var(--fs-sm);
+        font-weight: var(--fw-semibold);
+        color: var(--fg-default);
+      }
+      .layer__box {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--sp-4);
+        border: 1px solid var(--border-default);
+        border-radius: var(--r-md);
+        padding: var(--sp-3) var(--sp-4);
+        background: var(--bg-raised);
+        font-size: var(--fs-sm);
+        color: var(--fg-muted);
+      }
+      .layer__box b { color: var(--fg-default); font-weight: var(--fw-semibold); }
+      .layer__box .body { flex: 1; min-width: 0; }
+      /* 依赖标记收进盒内右对齐,不再浮在框外 */
+      .layer__dep {
+        flex: none;
+        font-family: var(--font-mono);
+        font-size: var(--fs-xs);
+        color: var(--fg-subtle);
+        white-space: nowrap;
+      }
+      .layer--src .layer__box { border-color: var(--accent-border); background: var(--accent-soft); }
+      .layer--src .layer__name { color: var(--accent-text); }
+      .layer--rt .layer__box { border-color: var(--border-strong); }
+      .layer--dep {
+        flex: none;
+        width: 132px;
+        text-align: right;
+        font-family: var(--font-mono);
+        font-size: var(--fs-xs);
+        color: var(--fg-subtle);
+        line-height: 1.35;
+      }
+      .arrow {
+        text-align: center;
+        color: var(--fg-subtle);
+        font-size: var(--fs-sm);
+        margin: 2px 0 2px 132px;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--sp-4);
+      }
+      @media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
+
+      .path {
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--r-lg);
+        background: var(--bg-raised);
+        padding: var(--sp-4);
+      }
+      .path__head {
+        display: flex;
+        align-items: center;
+        gap: var(--sp-2);
+        margin-bottom: var(--sp-3);
+        font-weight: var(--fw-semibold);
+        font-size: var(--fs-md);
+      }
+      .path__steps {
+        font-size: var(--fs-sm);
+        color: var(--fg-muted);
+        line-height: 1.9;
+      }
+      .path__steps b { color: var(--fg-default); }
+      .path--dev { border-top: 3px solid var(--accent); }
+      .path--rel { border-top: 3px solid var(--success); }
+
+      /* ---------------------------------------------------------------- 列表 */
+      ul.tight { margin: 0; padding-left: var(--sp-5); color: var(--fg-muted); }
+      ul.tight li { margin-bottom: var(--sp-1); }
+      ul.tight li b { color: var(--fg-default); }
+
+      .note {
+        margin-top: var(--sp-4);
+        padding: var(--sp-3) var(--sp-4);
+        border-left: 3px solid var(--warning);
+        background: var(--warning-soft);
+        border-radius: 0 var(--r-md) var(--r-md) 0;
+        font-size: var(--fs-sm);
+        color: var(--fg-muted);
+      }
+      .note b { color: var(--fg-default); }
+
+      .foot {
+        margin-top: var(--sp-9);
+        padding-top: var(--sp-4);
+        border-top: 1px solid var(--border-subtle);
+        font-size: var(--fs-xs);
+        color: var(--fg-subtle);
+        display: flex;
+        gap: var(--sp-4);
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body data-theme="light" data-density="comfortable">
+    <header class="top">
+      <span class="top__mark"></span>
+      <span class="top__title">SelaDB GUI 架构</span>
+      <span class="top__sub">HTML / CSS / JS 作为源语言 → 编译成 Rust</span>
+      <span class="top__spacer"></span>
+      <button class="top__toggle" id="themeBtn" type="button">切换主题</button>
+    </header>
+
+    <main class="wrap">
+      <!-- ============================================================ 0 -->
+      <section>
+        <h2><span class="n">0</span>一句话与两个硬约束</h2>
+        <div class="card">
+          <p style="font-size: var(--fs-md); color: var(--fg-default)">
+            <b>SelaDB 的界面用 HTML / CSS / JS 写，编译成 Rust。</b>
+            发布产物是纯 Rust 原生应用（无 JS 引擎、无 HTML 解析器、无 DOM）；
+            开发期有一个 Rust 写的解释器做即时预览。
+          </p>
+          <div class="grid2" style="margin-top: var(--sp-4)">
+            <div class="card constraint">
+              <div class="constraint__k">发布产物里没有 JS 引擎</div>
+              <div class="constraint__v">逻辑层必须能 AOT 到 Rust</div>
+              <div class="constraint__from">来自「最终编译都是翻译成 Rust」</div>
+            </div>
+            <div class="card constraint">
+              <div class="constraint__k">开发期要即时反馈</div>
+              <div class="constraint__v">必须有解释器，且要与 AOT 产出一致</div>
+              <div class="constraint__from">来自「主要还是开发运行时」</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-top: var(--sp-4)">
+          <div class="card">
+            <h3 style="margin-top: 0">为什么是 HTML/CSS/JS，不是自研 DSL</h3>
+            <ul class="tight">
+              <li><b>AI 时代的第一论据</b> —— 全世界 AI 训练数据里前端代码都是
+                HTML/CSS/JS。界面语言是 HTML/CSS 时 AI 零学习成本；换成自研
+                Rust DSL，它得学一套世界上没有先例的 API。</li>
+              <li><b>照抄语义比自己发明便宜一个数量级</b> —— DOM 语义、flexbox、
+                grid、级联、事件、焦点序、无障碍，全是全世界被验证过几万遍的东西。</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">设计源的角色变了</h3>
+            <ul class="tight">
+              <li>那 8362 行 JS <b>不是 mock，是逻辑层的浏览器版</b>。它在浏览器里
+                需要假后端，于是有 <code>mock-data.js</code>；SelaDB 里假后端换成
+                Rust 对象，<b>JS 一行不改</b>。</li>
+              <li>所以设计源从此不只是「视觉基线」，而是<b>逻辑层的可运行参考实现</b>：
+                浏览器里双击即开，Rust 引擎里跑真后端，同一份 JS。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 1 -->
+      <section>
+        <h2><span class="n">1</span>全景与依赖方向</h2>
+        <div class="fig">
+          <div class="layer layer--src">
+            <div class="layer__name">源码层</div>
+            <div class="layer__box">
+              <span class="body">
+                <b>HTML</b> 结构 + class　·　<b>CSS</b> tokens/styles/pages　·
+                <b>JS</b> 交互、状态机、视图编排
+              </span>
+              <span class="layer__dep">ui/</span>
+            </div>
+          </div>
+          <div class="arrow">↓ 编译期</div>
+
+          <div class="layer">
+            <div class="layer__name">解析</div>
+            <div class="layer__box">
+              <span class="body">
+                <b>gui-parse</b> HTML / CSS / JS → IR　·　<b>gui-ir</b> IR：节点模板 /
+                样式表 / 宿主绑定（零依赖）
+              </span>
+              <span class="layer__dep">gui-ir ← 一切</span>
+            </div>
+          </div>
+          <div class="arrow">↓ 两个执行路径</div>
+
+          <div class="split" style="margin-left: 132px; max-width: calc(100% - 132px)">
+            <div class="path path--dev">
+              <div class="path__head">gui-interp · 解释执行</div>
+              <div class="path__steps">
+                开发期专用<br />
+                改完就跑，<b>不等 cargo</b><br />
+                <span class="dim">与 AOT 共享同一套 IR</span>
+              </div>
+            </div>
+            <div class="path path--rel">
+              <div class="path__head">gui-codegen · AOT</div>
+              <div class="path__steps">
+                发布期<br />
+                IR → <b>Rust 源码</b> → cargo 编译<br />
+                <span class="dim">产物是读得懂、能断点的 Rust 代码</span>
+              </div>
+            </div>
+          </div>
+          <div class="arrow">↓ 两边共用</div>
+
+          <div class="layer layer--rt">
+            <div class="layer__name">运行时</div>
+            <div class="layer__box">
+              <span class="body">
+                <b>gui-core</b> 节点模型 · 布局（taffy）· 绘制（wgpu）· 事件
+                —— 不依赖解析器，将来可独立成仓
+              </span>
+              <span class="layer__dep">taffy · cosmic-text</span>
+            </div>
+          </div>
+          <div class="arrow">↓</div>
+
+          <div class="layer">
+            <div class="layer__name">应用</div>
+            <div class="layer__box">
+              <span class="body">
+                <b>seladb-gui</b> 模板 · 业务绑定 · 控件库 · 资源
+              </span>
+              <span class="layer__dep"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 2 -->
+      <section>
+        <h2><span class="n">2</span>IR：三个部分</h2>
+        <div class="grid3">
+          <div class="card">
+            <h3 style="margin-top: 0">节点模板</h3>
+            <p style="font-size: var(--fs-sm)">
+              「HTML 的结构」，<b>不是运行时的活树</b>。没有计算样式、没有几何、
+              没有事件监听。拆开的好处：模板可序列化（编译期产物）、可对比
+              （一致性测试）、可被 codegen 遍历。
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">样式表</h3>
+            <p style="font-size: var(--fs-sm)">
+              规则表 + 变量表（233 个 token）+ 主题层（data-theme / data-density）。
+              <b>「不支持」要报错，不能忽略</b> —— 解析遇到不认识的东西 →
+              记进 <code>unsupported</code> → 编译失败。
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">宿主绑定</h3>
+            <p style="font-size: var(--fs-sm)">
+              「Rust 给 JS 的那个对象」的接口面。
+              <b>不是凭空设计的</b> —— 是被设计源已经定义好的（见 §3）。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 3 -->
+      <section>
+        <h2><span class="n">3</span>「对象」：唯一的宿主收口</h2>
+        <p>
+          设计源在浏览器里跑的时候，逻辑层调的是
+          <code>mock-data.js</code> + <code>mock-sql.js</code> 里的全局。
+          实测：mock 层定义 31 个顶层名字，<b>逻辑层实际只用到 10 个</b>。
+        </p>
+        <div class="card" style="padding: 0; overflow: hidden">
+          <table>
+            <thead>
+              <tr>
+                <th>组</th>
+                <th>名字</th>
+                <th>Rust 侧对应</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td rowspan="7">数据</td><td><code>CONNECTIONS</code></td><td><code>list_databases</code> / 连接配置</td><td><span class="ok">已实现</span></td></tr>
+              <tr><td><code>TABLE_DATA</code></td><td>查询结果</td><td><span class="ok">已实现</span></td></tr>
+              <tr><td><code>TABLE_STRUCTURE</code></td><td><code>describe_table</code></td><td><span class="ok">已实现</span></td></tr>
+              <tr><td><code>DOCUMENTS</code></td><td>MongoDB 文档</td><td><span class="dim">未做</span></td></tr>
+              <tr><td><code>KEYS</code></td><td>Redis 键</td><td><span class="dim">未做</span></td></tr>
+              <tr><td><code>ENGINES</code></td><td><code>Engine</code> 枚举</td><td><span class="ok">已实现</span></td></tr>
+              <tr><td><code>UI_COPY</code></td><td>文案表</td><td><span class="dim">未做</span></td></tr>
+              <tr><td rowspan="3">函数</td><td><code>executeQuery(sql, {tables})</code></td><td><code>service::run_query</code></td><td><span class="ok">已实现</span></td></tr>
+              <tr><td><code>splitStatements(sql)</code></td><td>多语句切分</td><td><span class="tag tag--no">缺</span></td></tr>
+              <tr><td><code>generateDdl(dataKey)</code></td><td>DDL 预览</td><td><span class="tag tag--no">缺</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <b>其余 21 个是 mock 的内部辅助</b>（SQL 分词、DDL 拼装、类型推断），
+          逻辑层一次都不碰，<b>Rust 侧也不用做</b>。<br />
+          所以「换后端就是换实现，调用点一行不改」—— 这是这套架构最省事的地方。
+        </div>
+        <div class="grid2" style="margin-top: var(--sp-4)">
+          <div class="card">
+            <h3 style="margin-top: 0">名字必须逐字一致</h3>
+            <p style="font-size: var(--fs-sm)">
+              JS 侧是<b>全局</b>（设计源不能用 ES module，<code>file://</code> 下
+              CORS 会拦），所以宿主以 <code>SELADB</code> 注入全局作用域，
+              能力名与 mock 层逐字一致。
+            </p>
+            <p style="font-size: var(--fs-sm)">
+              <code>SELADB.TABLE_DATA</code> —— 浏览器里由 mock 提供，
+              SelaDB 里由 Rust 对象提供，<b>同一个名字</b>。
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">FFI / JNI 的收口</h3>
+            <p style="font-size: var(--fs-sm)">
+              Rust 侧可以把「调用其他语言（FFI / JNI）」的能力挂到这个对象上，
+              而<b>核心仍由 Rust 提供</b>。落法：对象持有一张不透明句柄表，
+              JS 侧 <code>SELADB.foreign.invoke(handle, "method", args)</code>，
+              <b>实际的外语调用由 Rust 执行</b>。
+            </p>
+            <p style="font-size: var(--fs-sm)">
+              好处：跨语言调用有<b>唯一收口</b>，可审计、可限制、可回溯。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ 4 -->
+      <section>
+        <h2><span class="n">4</span>实测：JS → Rust 这条路，语言层面可行</h2>
+        <div class="split">
+          <div class="card">
+            <h3 style="margin-top: 0">四个「无底洞」全是 0</h3>
+            <table>
+              <tbody>
+                <tr><td>生成器 / yield</td><td class="num">0</td><td class="dim">不用处理协程状态机</td></tr>
+                <tr><td>Proxy / Reflect</td><td class="num">0</td><td class="dim">不用做元编程</td></tr>
+                <tr><td>Symbol</td><td class="num">0</td><td class="dim">不用做属性键类型系统</td></tr>
+                <tr><td>eval / new Function</td><td class="num">0</td><td class="dim">不用做动态编译</td></tr>
+              </tbody>
+            </table>
+            <div class="note" style="margin-top: var(--sp-3)">
+              另外三个决定性的简化：<br />
+              · ES module 语法 <b>0 处</b>、跨文件重名 <b>0 个</b> → per-file 翻译成立，<b>不需要链接器</b><br />
+              · await <b>5 处</b>、async <b>4 处</b>、Promise <b>1 处</b> → <b>不必翻 async runtime</b><br />
+              · 正则 <b>99 条</b>，lookaround / 反向引用 / 命名组 <b>全是 0</b> → <b>可直译</b>到 Rust <code>regex</code> crate
+            </div>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">真正要设计的只有 3 处</h3>
+            <table>
+              <tbody>
+                <tr><td>闭包捕获可变外层变量</td><td class="num">69</td><td><span class="tag tag--warn">要 &amp;mut 生命周期</span></td></tr>
+                <tr><td>标签模板</td><td class="num">40</td><td><span class="tag tag--warn">要转 Rust 宏</span></td></tr>
+                <tr><td>类字段 <code>this.x =</code></td><td class="num">177</td><td><span class="tag tag--warn">要 &amp;mut self</span></td></tr>
+              </tbody>
+            </table>
+            <p style="font-size: var(--fs-sm); margin-top: var(--sp-3)">
+              其余是机械改写：<code>++</code>/<code>--</code> 2041 处、
+              <code>this.</code> 753 处、私有字段 <code>#</code> 234 处。
+            </p>
+            <p style="font-size: var(--fs-sm)">
+              局部 <code>let</code> 只占 18%（47 顶层 vs 57 全部）→
+              闭包捕获可变状态的面很窄，69 处可控。
+            </p>
+          </div>
+        </div>
+        <div class="card" style="margin-top: var(--sp-4)">
+          <h3 style="margin-top: 0">CSS 子集（同样实测）</h3>
+          <p style="font-size: var(--fs-sm)">
+            508 条声明组 / 528 条选择器。<b>子代 <code>&gt;</code>、通用兄弟
+            <code>~</code>、<code>:not()</code>、<code>:nth-child()</code>、
+            ID 选择器、<code>!important</code>、<code>calc()</code>、
+            <code>@media</code> / <code>@supports</code> / <code>@layer</code> /
+            <code>@container</code> / <code>@import</code> / <code>@font-face</code>
+            <b>全是 0</b>。
+          </p>
+          <p style="font-size: var(--fs-sm)">
+            所以「照抄 CSS」<b>不是「实现 Blink」，是「实现一个 CSS 子集引擎」</b>。
+          </p>
+        </div>
+      </section>
+
+      <!-- ============================================================ 5 -->
+      <section>
+        <h2><span class="n">5</span>虚拟化：节点不是数据的唯一通路</h2>
+        <p>
+          这是数据网格不炸内存的唯一办法，<b>浏览器也是这么做的</b>（它也不把行
+          放进 DOM）。设计源自己的数据网格早就是虚拟化的：<code>rowPool</code>
+          复用 DOM 行，只渲染「视口内 + 上下各 10 行余量」——
+          <b>它早就承认了「DOM 行不是数据通路」</b>。
+        </p>
+        <div class="split" style="margin-top: var(--sp-4)">
+          <div class="card">
+            <h3 style="margin-top: 0">结构节点</h3>
+            <ul class="tight">
+              <li>进节点树 ✓</li>
+              <li>参与布局 ✓</li>
+              <li>绘制：递归画子节点</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">虚拟化表节点</h3>
+            <ul class="tight">
+              <li>进节点树 <b>✗</b>（只存一个描述）</li>
+              <li>参与布局 ✓（占位 + 滚动条）</li>
+              <li>绘制：<b>引擎直接画行</b>，不经过节点树</li>
+            </ul>
+          </div>
+        </div>
+        <div class="note">
+          <b>关键点：虚拟化在引擎层，不在组件层。</b>
+          逻辑层只声明「这是一张 N 行的表 + 列定义 + 排序状态」，
+          行池、定位、绘制全在引擎。组件不是「自己实现虚拟化」。<br />
+          10 万行 × 10 列 = 100 万节点，每个几百字节 —— 直接爆内存。
+        </div>
+      </section>
+
+      <!-- ============================================================ 6 -->
+      <section>
+        <h2><span class="n">6</span>一致性与风险</h2>
+        <div class="card" style="border-left: 3px solid var(--accent)">
+          <h3 style="margin-top: 0">一致性契约 —— 本项目最关键的测试设施</h3>
+          <p style="font-size: var(--fs-md); color: var(--fg-default)">
+            <b>同一批 HTML/CSS/JS 输入，解释执行的结果与 AOT 产物的结果必须逐像素相同。</b>
+          </p>
+          <p style="font-size: var(--fs-sm)">
+            需要三样东西共用：同一套 IR、同一套宿主 API 面（§3 的 10 个名字）、
+            同一套样式匹配 / 布局 / 绘制实现（都在 gui-core）。
+          </p>
+          <p style="font-size: var(--fs-sm)">
+            <b>代价要说清楚：</b>JS 语义要在两处实现（解释器的引擎 + AOT 编译器）。
+            这是本架构<b>最容易被低估的成本</b>。缓解办法是子集足够小，
+            且两条路径共享绝大部分。
+          </p>
+        </div>
+        <div class="card" style="margin-top: var(--sp-4); padding: 0; overflow: hidden">
+          <table>
+            <thead>
+              <tr><th>#</th><th>风险</th><th>等级</th><th>缓解</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>R1</td>
+                <td><b>JS 语义双实现不一致</b>（解释器 vs AOT）</td>
+                <td><span class="tag tag--no">高</span></td>
+                <td>对拍是硬门禁；子集小</td>
+              </tr>
+              <tr>
+                <td>R2</td>
+                <td>闭包可变捕获在 Rust 里表达不了</td>
+                <td><span class="tag tag--no">高</span></td>
+                <td>M4 先验证；必要时限制子集</td>
+              </tr>
+              <tr>
+                <td>R3</td>
+                <td>自研 JS 解析器工作量大</td>
+                <td><span class="tag tag--warn">中</span></td>
+                <td>用 swc 系（Apache-2.0），不自研解析器</td>
+              </tr>
+              <tr>
+                <td>R4</td>
+                <td>总产能（框架已估 8–18 个月，加上工具链与开发套件）</td>
+                <td><span class="tag tag--no">高</span></td>
+                <td>里程碑切小；每步都有可运行产物</td>
+              </tr>
+              <tr>
+                <td>R5</td>
+                <td>cssparser 的 MPL-2.0 不在白名单</td>
+                <td><span class="tag tag--warn">中</span></td>
+                <td><b>待拍板</b>（taffy 的 parse feature 已依赖它）</td>
+              </tr>
+              <tr>
+                <td>R6</td>
+                <td>开发期运行时的成本被低估</td>
+                <td><span class="tag tag--warn">中</span></td>
+                <td>开发期可用现成引擎，一致性靠对拍</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ 7 -->
+      <section>
+        <h2><span class="n">7</span>里程碑与待拍板</h2>
+        <div class="split">
+          <div class="card">
+            <h3 style="margin-top: 0">里程碑</h3>
+            <table>
+              <tbody>
+                <tr><td>M0</td><td>gui-core 能编译</td></tr>
+                <tr><td>M1</td><td>gui-ir + gui-parse（HTML/CSS）</td></tr>
+                <tr><td>M2</td><td>布局 + 绘制，一个静态页面上屏</td></tr>
+                <tr><td>M3</td><td>gui-interp，解释执行 JS 逻辑层</td></tr>
+                <tr><td>M4</td><td>gui-codegen，翻一个真类（TreeView）</td></tr>
+                <tr><td>M5</td><td>宿主对象 SELADB，10 个能力接上</td></tr>
+                <tr><td>M6</td><td>虚拟化表，10 万行不爆内存</td></tr>
+                <tr><td>M7</td><td>一致性对拍，逐像素相同</td></tr>
+                <tr><td>M8</td><td>完整应用跑起来</td></tr>
+              </tbody>
+            </table>
+            <p style="font-size: var(--fs-sm); margin-top: var(--sp-3)">
+              <b>M4 是风险点</b>：第一个真类，闭包可变捕获（69 处）的问题会在这里
+              第一次暴露。
+            </p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top: 0">待拍板</h3>
+            <table>
+              <tbody>
+                <tr><td>D3</td><td>JS 解析器用 swc 还是自研</td><td class="dim">差一个数量级</td></tr>
+                <tr><td>D4</td><td>开发期运行时用现成引擎还是自研</td><td class="dim">差一个数量级</td></tr>
+                <tr><td>D5</td><td>HTML 结构翻成 Rust 代码还是编译成二进制</td><td class="dim">与「都是 Rust」有张力</td></tr>
+                <tr><td>D6</td><td>cssparser 的 MPL-2.0 白名单</td><td><span class="tag tag--no">硬阻塞</span></td></tr>
+              </tbody>
+            </table>
+            <p style="font-size: var(--fs-sm); margin-top: var(--sp-3)">
+              <b>D6 是唯一硬阻塞</b> —— taffy 的 <code>parse</code> feature 已经依赖
+              cssparser，不解决，<code>gui-parse</code> 的 CSS 解析器就没法开工。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="foot">
+        <span>配套文档：docs/gui-source-language.md</span>
+        <span>·</span>
+        <span>ADR-0006 自研 gui-core</span>
+        <span>·</span>
+        <span>gui-core-plan.md 引擎内部方案</span>
+        <span>·</span>
+        <span>实测脚本：scripts/probe-*.mjs</span>
+      </div>
+    </main>
+
+    <script>
+      // 主题跟随系统，可手动覆盖。与设计源同一套逻辑。
+      (function () {
+        var KEY = "seladb-doc-theme";
+        var media = window.matchMedia("(prefers-color-scheme: dark)");
+        var saved = null;
+        try {
+          saved = localStorage.getItem(KEY);
+        } catch (e) {
+          /* file:// 下个别浏览器禁 localStorage，忽略即可 */
+        }
+        function apply(t) {
+          document.body.setAttribute("data-theme", t);
+        }
+        function current() {
+          return document.body.getAttribute("data-theme");
+        }
+        apply(saved || (media.matches ? "dark" : "light"));
+        document.getElementById("themeBtn").addEventListener("click", function () {
+          var next = current() === "dark" ? "light" : "dark";
+          apply(next);
+          try {
+            localStorage.setItem(KEY, next);
+          } catch (e) {
+            /* 忽略 */
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

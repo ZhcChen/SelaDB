@@ -652,6 +652,35 @@ await page.goto(`${BASE}#/entry`, { waitUntil: "networkidle" });
 await page.waitForSelector(".entry__card", { timeout: 5000 });
 await shot(page, "06-entry");
 
+// ---- 架构文档页 ----
+// docs/architecture.html 是 GUI 架构的可读版。它引用 ui/assets/tokens.css,
+// 跟设计源共用一套 token —— 所以它坏了通常意味着 token 改名了,必须挡住。
+console.log("\n[15] 架构文档页");
+const docPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const docErrors = [];
+docPage.on("console", (m) => {
+  if (m.type() === "error") docErrors.push(m.text());
+});
+docPage.on("pageerror", (e) => docErrors.push(String(e)));
+await docPage.goto(`file://${resolve(here, "..", "..", "docs", "architecture.html")}`, { waitUntil: "networkidle" });
+await docPage.waitForSelector(".layer", { timeout: 5000 });
+check(
+  "架构文档页无控制台错误",
+  docErrors.length === 0,
+  docErrors.slice(0, 3).join(" | "),
+);
+const docLayers = await docPage.locator(".layer").count();
+check("架构文档页渲染出分层图", docLayers >= 4, `层数 ${docLayers}`);
+const docToken = await docPage.evaluate(
+  () => getComputedStyle(document.body).backgroundColor,
+);
+check(
+  "架构文档页用上了设计源的 token",
+  docToken === "rgb(255, 255, 255)" || docToken === "rgb(21, 21, 21)",
+  `body 底色 ${docToken}`,
+);
+await docPage.close();
+
 // ---- 控制台 ----
 console.log("\n[14] 控制台");
 check("无控制台错误", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
