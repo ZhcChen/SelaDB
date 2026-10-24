@@ -14,16 +14,35 @@
 
 ## 当前状态
 
-| 引擎 | 驱动 | 目标档位 | 当前档位 | 状态 |
-|---|---|---|---|---|
-| SQLite | `rusqlite` 0.40 | 可用 | **可用** | ✅ 已实现（2026-10-24） |
-| PostgreSQL | `tokio-postgres` 0.7.18 / `sqlx` 0.9 | 完整 | — | 计划中 |
-| MySQL / MariaDB | `sqlx` 0.9 | 完整 | — | 计划中 |
-| SQL Server | 待选 | 可用 | — | 计划中 |
-| ClickHouse | `clickhouse-rs` | 可用 | — | 计划中 |
-| Redis | `redis` 1.7.1 | 可用 | — | 计划中 |
-| MongoDB | `mongodb` | 部分 | — | 计划中 |
-| Oracle | 待选 | 尽力而为 | — | 计划中 |
+| 引擎 | 驱动（同步） | 许可 | 目标档位 | 当前档位 | 状态 |
+|---|---|---|---|---|---|
+| SQLite | `rusqlite` 0.40.2 | MIT | 可用 | **可用** | ✅ 已实现（2026-10-24） |
+| PostgreSQL | `postgres` 0.19.14 | MIT OR Apache-2.0 | 完整 | — | 计划中 |
+| MySQL / MariaDB | `mysql` 28.0.4 | MIT OR Apache-2.0 | 完整 | — | 计划中 |
+| ClickHouse | `clickhouse-rs` 0.1.21 | MIT | 可用 | — | 计划中 |
+| Redis | `redis` 1.8.0 | BSD-3-Clause | 可用 | — | 计划中 |
+| MongoDB | **无同步驱动** | — | 部分 | — | 后置 |
+| SQL Server | **无同步驱动**（`tiberius` 0.13.0 是异步） | — | 可用 | — | 后置 |
+| Oracle | 待选 | — | 尽力而为 | — | 计划中 |
+
+### 驱动层是全同步的（2026-10-24 定）
+
+`Driver::open` 与全部能力 trait 都是同步 `fn`。这是**主动选型**，不是省事。
+
+理由：GUI 是事件循环模型，主线程不能被 DB 操作阻塞，所以 DB 操作本来就要
+落在 worker 线程上 —— 同步 trait 与这个形态天然合拍。反过来，async 会在
+core / service / CLI / 未来的 MCP / GUI 之间**传染**（Rust 里 async 一旦
+进来就很难不进来），代价远大于收益。
+
+代价是明确的，记在这里：
+
+- **MongoDB 与 SQL Server 没有同步驱动**（`mongodb` 与 `tiberius` 都是
+  tokio-based）。这两个后置。届时用「驱动内部自己起线程 + 通道」的方式包，
+  **上层一行不用改**。
+- 同步 socket 的查询卡住会占住 worker 线程，靠连接池 + `statement_timeout`
+  兜住。
+- **不用 `sqlx`**：它 0.9.0 要 rust 1.94，而 workspace 的 MSRV 是 1.87
+  （accesskit 0.25.1 的下限）。`postgres` 只要 1.85。
 
 SQLite 是**第一个**落地的引擎，不是随手挑的 —— 它不需要服务器、不需要网络、
 能用 `bundled` 特性静态编译，是验证「引擎抽象站不站得住」最省事的样本。

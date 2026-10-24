@@ -41,6 +41,13 @@ pub enum DriverError {
 pub type DriverResult<T> = Result<T, DriverError>;
 
 /// 引擎工厂：拿到配置，返回一个连接。
+///
+/// **驱动层是全同步的**（2026-10-24 定）。GUI 是事件循环模型，DB 操作
+/// 本来就要落在 worker 线程上，同步 trait 与这个形态天然合拍；async 会
+/// 在 core / service / CLI / GUI 之间传染，代价远大于收益。
+///
+/// 代价：MongoDB 与 SQL Server 没有同步驱动（`mongodb` / `tiberius` 都是
+/// tokio-based），这两个引擎后置，届时在驱动内部起线程包起来，上层不改。
 pub trait Driver: Send + Sync {
     /// 这个驱动服务的引擎。
     fn engine(&self) -> Engine;

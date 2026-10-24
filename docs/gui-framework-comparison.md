@@ -1,4 +1,4 @@
-# GUI 框架对比分析：nanoui vs gpui vs 自研
+# GUI 框架对比分析：nanoui vs gpui vs AUI vs 自研
 
 > 日期：2026-10-22
 > 目的：在动工写 `crates/gui-core/` 之前，把两个可参考实现逐层拆开，明确「照抄谁、抄哪一层、什么一律不抄」。
@@ -11,6 +11,9 @@
 3. **gpui 是次参考**——只取三样：逐平台 IME 的协议细节、`examples/data_table.rs` 的数据网格蓝本、`examples/input.rs` 的输入处理蓝本。
 4. **一律不抄**：nanoui 的自研 flexbox / 自研 TrueType / OpenGL 后端 / CPU 软渲染；gpui 的整个渲染栈（blade + D3D11）。
 5. **gpui 的 `icons` crate 是 GPL-3.0-or-later 且未发布**，不能用。这正是 nanoui 相对 gpui 的直接优势。
+6. **AUI（C++20，MPL-2.0）不作为替代**（2026-10-24 评估）——它没有 CSS 文本解析器、
+   没有 `var()` 机制、没有 Flexbox，三道坎各自都要额外一层；但它的
+   `aui.uitests` 是 `TestHarness` 最好的蓝本。详见 §3.6。
 
 ---
 
@@ -110,6 +113,88 @@ tree.expanded("public.users");
 ```
 
 而不是按内部结构写。这与仓库 `docs/fidelity-measurement.md` 的几何断言思路能接上。
+
+---
+
+## 3.6 AUI（C++20）的评估：2026-10-24
+
+> 结论：**不作为 `gui-core` 的替代**，但 `aui.uitests` 是 `TestHarness` 最好的蓝本。
+
+### 事实
+
+| 项 | 值 |
+|---|---|
+| 仓库 | `aui-framework/aui` |
+| 许可 | **MPL-2.0**（与 `cssparser` 同级） |
+| 语言 | C++20，跨平台，Qt 风格 |
+| 规模 | 2599 文件 / 54.7 万行 C++（`aui.core` 4.97 万 + `aui.views` 3.74 万） |
+| 版本 | **v8.0.0-rc.21**（RC，未正式发布） |
+| 维护 | 单一主维护者 `Alex2772`；最新提交 2026-10-24 |
+| 渲染后端 | **OpenGL**（macOS 走 AGL），不是 Metal |
+| 平台成熟度 | AUI 自己的 `docs/macos.md` 写着「macOS 支持处于早期阶段，缺少很多特性」 |
+
+### 三道坎（为什么不能当替代）
+
+1. **语言**：C++20 vs Rust。要么 FFI（C++ core + Rust 绑），要么 C++ GUI 进程 + IPC。两条都要额外一层。
+2. **样式模型** —— 这道最致命：AUI **没有 CSS 文本解析器，也没有 `var()` 机制**。
+   样式是 C++ 的 `ass` DSL（`ass::Padding` / `ass::Margin` / `class_of<T>` / `hovered` / `Selected`），
+   仓库里唯一的 `.css` 是文档站的样式。**我们 1084 处 `var()`、233 个 token 定义、
+   4170 行 CSS 全部要重写成 C++ 表达式，或者写一个 CSS→C++ 转译器** ——
+   而 `gui-core-plan.md` §5.1 的整套 CSS 子集规格正是为了「引擎直接吃 CSS 文本」设计的。
+   `CustomProperty` 只是「样式应用时回调用户函数」，跟 CSS 变量无关。
+3. **布局**：**没有 Flexbox**。只有 Grid / Horizontal / Vertical / Stacked / Absolute / WordWrapping。
+   taffy 有 Flexbox + Grid + Block；设计源里 29 处 `display: grid` 加大量 flex。
+
+### 实测（本地编译 + 跑测试）
+
+```bash
+git clone --depth 1 https://github.com/aui-framework/aui.git
+cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DAUI_BUILD_EXAMPLES=ON
+ninja -j8        # 712 个目标
+```
+
+1. **默认编译失败**：Apple clang 21 的 libc++ 移除了 `_LIBCPP_TEMPLATE_VIS`，
+   依赖 `range-v3` 编译不过。加 `-DCMAKE_CXX_FLAGS="-D_LIBCPP_TEMPLATE_VIS="` 可解。
+   AUI 的 CI 跑在 `macos-15`（Xcode 16 的 clang）上，覆盖不到这个组合。
+2. 绕过宏后 **712/712 编译成功，2 分 47 秒（8 线程）**。
+3. **669 个测试 / 100 个套件**：
+   - 506 通过
+   - **10 个失败**（`UILabel` ×3、`UIStyleTest` ×6、`UIScreenAnalyzer` ×1）——
+     断言在 `aui.image/src/AUI/Image/AImage.cpp:64` 的 `AImageView::cropped()`，
+     即**字形图集裁剪越界**（软件渲染路径）
+   - **1 个段错误**（`UILayoutTest.SmallCorner1`，`View::onLayout` 里空指针解引用，
+     `EXC_BAD_ACCESS at 0x4c0`），阻断了后续约 163 个测试
+
+**排除法做过三轮，都不是别的原因：**
+
+- 用 Homebrew **LLVM 21**（自带 libc++，非 Apple 的）重建 → **同样 10 失败 + 同样段错误**。不是 Apple 工具链的问题。
+- 把稳定路径上的中文字体 `STHeiti Light.ttc` 提到候选首位 → 日志确认
+  `Loaded CJK fallback font` **加载成功**，但 10 个失败**依旧**。不是 CJK 回退字体的问题。
+  （顺带发现 AUI 的中文字体回退列表在现代 macOS 上全失效：
+  `PingFang.ttc` 已移到 `/System/Library/AssetsV2/...` 的资产哈希路径，
+  而 AUI 硬编码的 `/System/Library/Fonts/PingFang.ttc` 不存在；加载失败只打 WARN，不降级。）
+- 崩溃栈经 `~/Library/Logs/DiagnosticReports/Tests-*.ips` 读出，是空指针解引用，
+  不是越界写。
+
+**结论**：AUI 的**无头/软件渲染路径在 macOS 上有系统性缺陷**（字形图集裁剪越界 + 布局期空指针），
+而且与编译器无关。这是 AUI 自己的 macOS 成熟度问题，不是我们用法的问题。
+
+### 唯一值得抄的：`aui.uitests`
+
+这是本次评估最有价值的产出 —— 它几乎逐条对上 AGENTS.md 硬约束 8
+（「跑 GUI 用例一律无头……框架侧照 nanoui 的 Tester 模式提供 `TestHarness`」）：
+
+| AUI 的做法 | 落到 `gui-core::TestHarness` |
+|---|---|
+| `testing::UITest` 切到 `AStubWindowManager` + **软件渲染器**，无显示器可跑 | 不创建 winit 窗口，进程内用软件光栅化 |
+| 视图照常布局、样式、渲染；**软件渲染器输出确定**，任意时刻可截图 | 确定性渲染 → 截图可当回归基准 |
+| `By::text()` / `By::name()` 找视图，`click()` / `type()` 喂输入 | 按可感知语义找元素、喂合成事件 |
+| `uitest::frame()` 推进布局与样式，`AUI_REPEAT(10)` 让布局稳定 | 手动推进虚拟时钟与布局 |
+| `averageColor(color, inaccuracy)` / `pixelColorAt({x,y}, …)` **像素级断言** | 渲染结果可直接断言颜色与像素位置 |
+| **失败时自动把截图写进 `reports/`，并把匹配到的视图用红框标出来** | 失败报告自带定位，不用来回翻代码 |
+
+**特别值得抄的一条是最后一条**：失败自动出「红框标注的截图」。
+这比我们现在的做法好 —— 我们目前只能靠人工在 15 张基准图里找差异。
 
 ---
 
