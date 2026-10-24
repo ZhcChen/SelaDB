@@ -37,7 +37,11 @@ crates/seladb-core/     领域模型、驱动、查询、服务编排
 crates/seladb-cli/      CLI 入口（clap）
 crates/seladb-mcp/      MCP Server 入口
 crates/seladb-gui/      GUI 入口
-crates/gui-core/        自研 GUI 框架（taffy + cosmic-text + wgpu + winit）
+crates/gui-core/        GUI 运行时：节点模型 + 布局 + 绘制 + 事件
+crates/gui-ir/          GUI 中间表示（零依赖，纯数据结构）
+crates/gui-parse/       HTML / CSS / JS → IR
+crates/gui-interp/      解释执行（开发期，即时预览）
+crates/gui-codegen/     AOT：IR → Rust 源码（发布期）
 ui/                     UI 设计源（纯 HTML + CSS + JS，不进 Cargo 工作区）
 design/tokens.json      唯一设计源：颜色/间距/字号/圆角/阴影/动效
 docs/                   架构文档与 ADR

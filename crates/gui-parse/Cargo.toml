@@ -1,0 +1,12 @@
+[package]
+name = "gui-parse"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "MIT OR Apache-2.0"
+description = "SelaDB GUI 源语言工具链：gui-parse"
+
+[dependencies]
+gui-ir = { path = "../gui-ir" }
+# CSS 解析。cssparser 是 MPL-2.0（文件级弱 copyleft），列入白名单与否待拍板。
+cssparser = "0.38"

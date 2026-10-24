@@ -1,0 +1,10 @@
+[package]
+name = "gui-ir"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "MIT OR Apache-2.0"
+description = "SelaDB GUI 源语言工具链：gui-ir"
+
+[dependencies]
+# 刻意为空：IR 是纯数据结构，零依赖。

@@ -762,6 +762,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gui-codegen"
+version = "0.1.0"
+dependencies = [
+ "gui-ir",
+]
+
+[[package]]
 name = "gui-core"
 version = "0.1.0"
 dependencies = [
@@ -772,6 +779,27 @@ dependencies = [
  "taffy",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "gui-interp"
+version = "0.1.0"
+dependencies = [
+ "gui-core",
+ "gui-ir",
+ "gui-parse",
+]
+
+[[package]]
+name = "gui-ir"
+version = "0.1.0"
+
+[[package]]
+name = "gui-parse"
+version = "0.1.0"
+dependencies = [
+ "cssparser",
+ "gui-ir",
 ]
 
 [[package]]

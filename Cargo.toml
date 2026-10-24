@@ -3,6 +3,11 @@ resolver = "2"
 members = [
     "crates/seladb-core",
     "crates/seladb-cli",
+    # GUI 源语言工具链（HTML/CSS/JS → Rust）
+    "crates/gui-ir",
+    "crates/gui-parse",
+    "crates/gui-interp",
+    "crates/gui-codegen",
     "crates/gui-core",
 ]
 
